@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Bluemax - Demo Plaid</title>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+    button { padding: 10px 18px; font-size: 15px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
+    .debito { color: #b91c1c; }
+    .credito { color: #15803d; }
+    #status { margin-top: 12px; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Bluemax - Demo Plaid</h1>
+  <p>Conecta una cuenta de banco (sandbox) y trae debitos y creditos.</p>
+  <button id="connect-btn">Conectar banco</button>
+  <div id="status"></div>
+  <table id="tx-table" style="display:none">
+    <thead>
+      <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th>Monto</th></tr>
+    </thead>
+    <tbody id="tx-body"></tbody>
+  </table>
+
+  <script>
+    const statusEl = document.getElementById('status');
+
+    async function createLinkToken() {
+      const res = await fetch('/api/create_link_token', { method: 'POST' });
+      const data = await res.json();
+      return data.link_token;
+    }
+
+    async function loadTransactions() {
+      statusEl.textContent = 'Cargando transacciones...';
+      const res = await fetch('/api/transactions');
+      const data = await res.json();
+      if (data.error) {
+        statusEl.textContent = 'Error: ' + data.error;
+        return;
+      }
+      const tbody = document.getElementById('tx-body');
+      tbody.innerHTML = '';
+      data.transactions.forEach((t) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t.fecha}</td>
+          <td>${t.descripcion}</td>
+          <td class="${t.tipo}">${t.tipo}</td>
+          <td>$${t.monto.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('tx-table').style.display = 'table';
+      statusEl.textContent = `${data.transactions.length} transacciones encontradas.`;
+    }
+
+    document.getElementById('connect-btn').addEventListener('click', async () => {
+      statusEl.textContent = 'Abriendo Plaid Link...';
+      const linkToken = await createLinkToken();
+
+      const handler = Plaid.create({
+        token: linkToken,
+        onSuccess: async (public_token, metadata) => {
+          statusEl.textContent = 'Cuenta conectada. Intercambiando token...';
+          await fetch('/api/exchange_public_token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_token }),
+          });
+          await loadTransactions();
+        },
+        onExit: (err, metadata) => {
+          if (err) statusEl.textContent = 'Se cerro Plaid Link con un error.';
+        },
+      });
+
+      handler.open();
+    });
+  </script>
+</body>
+</html>
