@@ -72,29 +72,60 @@ app.post('/api/exchange_public_token', async (req, res) => {
 
 // Sincroniza el store en memoria con Plaid usando /transactions/sync.
 // Pagina con el cursor y aplica added / modified / removed.
+//
+// Importante: acumulamos los cambios en memoria temporal y recien los aplicamos
+// cuando la paginacion termino COMPLETA. Si Plaid avisa que los datos cambiaron
+// a mitad de la paginacion (TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION),
+// descartamos lo parcial y reintentamos desde el ultimo cursor guardado.
 async function syncTransactions() {
   if (!ACCESS_TOKEN) return;
 
-  let hasMore = true;
-  while (hasMore) {
-    const response = await plaidClient.transactionsSync({
-      access_token: ACCESS_TOKEN,
-      cursor: CURSOR || undefined,
-    });
-    const data = response.data;
+  const MAX_REINTENTOS = 3;
 
-    data.added.forEach((t) => {
-      TRANSACTIONS[t.transaction_id] = t;
-    });
-    data.modified.forEach((t) => {
-      TRANSACTIONS[t.transaction_id] = t;
-    });
-    data.removed.forEach((r) => {
-      delete TRANSACTIONS[r.transaction_id];
-    });
+  for (let intento = 0; intento < MAX_REINTENTOS; intento++) {
+    // Arrancamos siempre desde el cursor persistido, no desde uno intermedio.
+    let cursor = CURSOR;
+    const added = [];
+    const modified = [];
+    const removed = [];
 
-    hasMore = data.has_more;
-    CURSOR = data.next_cursor;
+    try {
+      let hasMore = true;
+      while (hasMore) {
+        const response = await plaidClient.transactionsSync({
+          access_token: ACCESS_TOKEN,
+          cursor: cursor || undefined,
+        });
+        const data = response.data;
+
+        added.push(...data.added);
+        modified.push(...data.modified);
+        removed.push(...data.removed);
+
+        hasMore = data.has_more;
+        cursor = data.next_cursor;
+      }
+
+      // La paginacion termino OK: recien ahora aplicamos los cambios y guardamos el cursor.
+      added.forEach((t) => {
+        TRANSACTIONS[t.transaction_id] = t;
+      });
+      modified.forEach((t) => {
+        TRANSACTIONS[t.transaction_id] = t;
+      });
+      removed.forEach((r) => {
+        delete TRANSACTIONS[r.transaction_id];
+      });
+      CURSOR = cursor;
+      return;
+    } catch (err) {
+      const code = err.response && err.response.data && err.response.data.error_code;
+      // Los datos cambiaron durante la paginacion: descartamos lo parcial y reintentamos.
+      if (code === 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION' && intento < MAX_REINTENTOS - 1) {
+        continue;
+      }
+      throw err;
+    }
   }
 }
 
