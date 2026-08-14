@@ -2,115 +2,231 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Bluemax - Demo Plaid</title>
-  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bluemax - Panel</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
-    button { padding: 10px 18px; font-size: 15px; cursor: pointer; margin-right: 8px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
+    body { font-family: system-ui, sans-serif; max-width: 840px; margin: 40px auto; padding: 0 16px; color: #111; }
+    h1 { margin-bottom: 4px; }
+    h3 { margin-top: 28px; }
+    button { padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #f7f7f7; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; }
+    input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }
     .debito { color: #b91c1c; }
     .credito { color: #15803d; }
-    #status { margin-top: 12px; color: #555; }
+    .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+    .badge.ok { background: #dcfce7; color: #15803d; }
+    .badge.pend { background: #fef9c3; color: #a16207; }
+    .card { border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .muted { color: #666; font-size: 13px; }
+    .hidden { display: none; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spread { justify-content: space-between; }
   </style>
 </head>
 <body>
-  <h1>Bluemax - Demo Plaid</h1>
-  <p>Conecta una cuenta de banco (sandbox) y trae debitos y creditos.</p>
-  <button id="connect-btn">Conectar banco</button>
-  <button id="refresh-btn" style="display:none">Recargar transacciones</button>
-  <div id="status"></div>
-  <table id="tx-table" style="display:none">
-    <thead>
-      <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th>Monto</th></tr>
-    </thead>
-    <tbody id="tx-body"></tbody>
-  </table>
+
+  <!-- ================= LOGIN ================= -->
+  <section id="screen-login">
+    <h1>Bluemax - Panel</h1>
+    <p class="muted">Ingresa para administrar tus clientes.</p>
+    <div class="row">
+      <input id="login-pass" type="password" placeholder="Clave de administrador">
+      <button class="primary" id="login-btn">Ingresar</button>
+    </div>
+    <div id="login-error" class="muted" style="color:#b91c1c"></div>
+  </section>
+
+  <!-- ================= LISTA DE CLIENTES ================= -->
+  <section id="screen-clientes" class="hidden">
+    <div class="row spread">
+      <h1>Clientes</h1>
+      <button class="link" id="logout-btn">Salir</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="nuevo-nombre" placeholder="Nombre del cliente">
+      <input id="nuevo-email" placeholder="Email (opcional)">
+      <button class="primary" id="add-btn">Agregar cliente</button>
+    </div>
+    <div id="clientes-lista"></div>
+  </section>
+
+  <!-- ================= DETALLE DE CLIENTE ================= -->
+  <section id="screen-detalle" class="hidden">
+    <button class="link" id="volver-btn">&larr; Volver a clientes</button>
+    <h1 id="detalle-nombre"></h1>
+    <div id="detalle-estado" class="muted"></div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="link-btn">Generar link para el cliente</button>
+      <button id="refresh-btn">Actualizar datos</button>
+    </div>
+    <div id="link-box" class="muted" style="margin-top:8px"></div>
+
+    <h3>Cuentas</h3>
+    <div id="cuentas-box" class="muted">Sin datos todavia.</div>
+
+    <h3>Transacciones</h3>
+    <div id="tx-box" class="muted">Sin datos todavia.</div>
+  </section>
 
   <script>
-    const statusEl = document.getElementById('status');
-    const refreshBtn = document.getElementById('refresh-btn');
-    const table = document.getElementById('tx-table');
-    const tbody = document.getElementById('tx-body');
-
+    let token = localStorage.getItem('adminToken') || null;
+    let clienteActual = null;
     let pollTimer = null;
 
-    async function createLinkToken() {
-      const res = await fetch('/api/create_link_token', { method: 'POST' });
-      const data = await res.json();
-      return data.link_token;
+    const $ = (id) => document.getElementById(id);
+
+    function show(screen) {
+      ['screen-login', 'screen-clientes', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
+      $(screen).classList.remove('hidden');
     }
 
-    function render(transactions) {
-      tbody.innerHTML = '';
-      transactions.forEach((t) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${t.fecha}</td>
-          <td>${t.descripcion}</td>
-          <td class="${t.tipo}">${t.tipo}</td>
-          <td>$${t.monto.toFixed(2)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-      table.style.display = transactions.length ? 'table' : 'none';
+    async function api(path, opts = {}) {
+      opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(path, opts);
+      return res.json();
     }
 
-    // Consulta las transacciones que ya tiene el server (NO reconecta el banco).
-    async function loadTransactions() {
-      const res = await fetch('/api/transactions');
-      const data = await res.json();
-      if (data.error) {
-        // 400 = todavia no hay una cuenta conectada. No mostramos nada feo.
-        return false;
+    // ---------- Login ----------
+    $('login-btn').addEventListener('click', async () => {
+      const password = $('login-pass').value;
+      const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) });
+      if (data.token) {
+        token = data.token;
+        localStorage.setItem('adminToken', token);
+        $('login-pass').value = '';
+        $('login-error').textContent = '';
+        irAClientes();
+      } else {
+        $('login-error').textContent = data.error || 'Error al ingresar';
       }
-      render(data.transactions);
-      refreshBtn.style.display = 'inline-block';
-      statusEl.textContent = `${data.transactions.length} transacciones encontradas.`;
-      return true;
-    }
-
-    // Tras conectar, Plaid sigue cargando los 24 meses en segundo plano.
-    // Refrescamos solos cada 4s por ~1 min para ver como sube el total.
-    function autoActualizar() {
-      if (pollTimer) clearInterval(pollTimer);
-      let intentos = 0;
-      pollTimer = setInterval(async () => {
-        intentos++;
-        await loadTransactions();
-        if (intentos >= 15) clearInterval(pollTimer);
-      }, 4000);
-    }
-
-    // Al abrir o recargar la pagina, mostramos lo que ya haya en el server.
-    loadTransactions();
-
-    // Boton para refrescar la tabla sin reconectar el banco.
-    refreshBtn.addEventListener('click', loadTransactions);
-
-    document.getElementById('connect-btn').addEventListener('click', async () => {
-      statusEl.textContent = 'Abriendo Plaid Link...';
-      const linkToken = await createLinkToken();
-
-      const handler = Plaid.create({
-        token: linkToken,
-        onSuccess: async (public_token, metadata) => {
-          statusEl.textContent = 'Cuenta conectada. Cargando transacciones...';
-          await fetch('/api/exchange_public_token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ public_token }),
-          });
-          await loadTransactions();
-          autoActualizar();
-        },
-        onExit: (err, metadata) => {
-          if (err) statusEl.textContent = 'Se cerro Plaid Link con un error.';
-        },
-      });
-
-      handler.open();
     });
+    $('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); });
+
+    $('logout-btn').addEventListener('click', () => {
+      token = null;
+      localStorage.removeItem('adminToken');
+      show('screen-login');
+    });
+
+    // ---------- Lista de clientes ----------
+    async function irAClientes() {
+      if (pollTimer) clearInterval(pollTimer);
+      show('screen-clientes');
+      const data = await api('/api/clientes');
+      if (data.error) { // sesion vencida
+        token = null; localStorage.removeItem('adminToken'); show('screen-login'); return;
+      }
+      const cont = $('clientes-lista');
+      cont.innerHTML = '';
+      if (!data.clientes.length) {
+        cont.innerHTML = '<p class="muted">Todavia no hay clientes. Agrega el primero arriba.</p>';
+        return;
+      }
+      data.clientes.forEach((c) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        const badge = c.conectado
+          ? '<span class="badge ok">Conectado</span>'
+          : '<span class="badge pend">Pendiente</span>';
+        div.innerHTML = `
+          <div>
+            <strong>${c.nombre}</strong> ${badge}<br>
+            <span class="muted">${c.email || 'sin email'} &middot; ${c.cantidadCuentas} cuentas &middot; ${c.cantidadTransacciones} transacciones</span>
+          </div>
+          <button>Ver</button>
+        `;
+        div.querySelector('button').addEventListener('click', () => verCliente(c.id, c.nombre));
+        cont.appendChild(div);
+      });
+    }
+
+    $('add-btn').addEventListener('click', async () => {
+      const nombre = $('nuevo-nombre').value.trim();
+      const email = $('nuevo-email').value.trim();
+      if (!nombre) return;
+      await api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre, email }) });
+      $('nuevo-nombre').value = '';
+      $('nuevo-email').value = '';
+      irAClientes();
+    });
+
+    // ---------- Detalle de cliente ----------
+    async function verCliente(id, nombre) {
+      clienteActual = id;
+      show('screen-detalle');
+      $('detalle-nombre').textContent = nombre;
+      $('detalle-estado').textContent = '';
+      $('link-box').textContent = '';
+      $('cuentas-box').textContent = 'Cargando...';
+      $('tx-box').textContent = 'Cargando...';
+      await cargarDatos();
+      // Auto-refresco: mientras Plaid completa los 24 meses en segundo plano.
+      if (pollTimer) clearInterval(pollTimer);
+      let n = 0;
+      pollTimer = setInterval(async () => {
+        n++;
+        await cargarDatos();
+        if (n >= 12) clearInterval(pollTimer); // ~1 min
+      }, 5000);
+    }
+
+    $('volver-btn').addEventListener('click', irAClientes);
+
+    $('link-btn').addEventListener('click', async () => {
+      const data = await api('/api/clientes/' + clienteActual + '/link', { method: 'POST' });
+      if (data.url) {
+        $('link-box').innerHTML = 'Envia este link al cliente para que conecte su banco:<br>'
+          + '<input style="width:100%;margin-top:6px" readonly value="' + data.url + '" onclick="this.select()">';
+      }
+    });
+
+    $('refresh-btn').addEventListener('click', cargarDatos);
+
+    async function cargarDatos() {
+      const data = await api('/api/clientes/' + clienteActual + '/datos');
+      if (data.error) {
+        $('cuentas-box').textContent = data.error;
+        $('tx-box').textContent = '';
+        return;
+      }
+      $('detalle-estado').textContent = data.conectado
+        ? 'Banco conectado.'
+        : 'El cliente todavia no conecto su banco. Genera el link y enviaselo.';
+
+      // Cuentas
+      if (!data.accounts.length) {
+        $('cuentas-box').textContent = 'Sin cuentas todavia.';
+      } else {
+        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th>Saldo</th></tr></thead><tbody>';
+        data.accounts.forEach((a) => {
+          const saldo = a.saldo != null ? '$' + a.saldo.toFixed(2) + ' ' + a.moneda : '-';
+          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td>${saldo}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        $('cuentas-box').innerHTML = html;
+      }
+
+      // Transacciones
+      if (!data.transactions.length) {
+        $('tx-box').textContent = 'Sin transacciones todavia.';
+      } else {
+        let html = '<p class="muted">' + data.transactions.length + ' transacciones</p>'
+          + '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th>Monto</th></tr></thead><tbody>';
+        data.transactions.forEach((t) => {
+          html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td class="${t.tipo}">${t.tipo}</td><td>$${t.monto.toFixed(2)}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        $('tx-box').innerHTML = html;
+      }
+    }
+
+    // ---------- Arranque ----------
+    if (token) irAClientes(); else show('screen-login');
   </script>
 </body>
 </html>
