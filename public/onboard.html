@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conecta tu banco</title>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 520px; margin: 60px auto; padding: 0 20px; color: #111; text-align: center; }
+    h1 { margin-bottom: 8px; }
+    button { padding: 12px 22px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background: #2563eb; color: #fff; margin-top: 16px; }
+    .muted { color: #666; font-size: 15px; margin-top: 10px; }
+    .ok { color: #15803d; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Conecta tu banco</h1>
+  <p id="saludo" class="muted"></p>
+  <button id="connect-btn">Conectar banco</button>
+  <div id="status" class="muted"></div>
+
+  <script>
+    const onboardToken = new URLSearchParams(location.search).get('token');
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connect-btn');
+
+    async function init() {
+      if (!onboardToken) {
+        connectBtn.style.display = 'none';
+        statusEl.textContent = 'Link invalido.';
+        return;
+      }
+      const res = await fetch('/api/onboard/' + onboardToken);
+      const data = await res.json();
+      if (data.error) {
+        connectBtn.style.display = 'none';
+        statusEl.textContent = data.error;
+        return;
+      }
+      document.getElementById('saludo').textContent = 'Vas a conectar de forma segura el banco de: ' + data.nombre;
+      if (data.conectado) {
+        statusEl.textContent = 'Ya conectaste tu banco. Si queres, podes volver a conectarlo para actualizar.';
+      }
+    }
+
+    connectBtn.addEventListener('click', async () => {
+      statusEl.textContent = 'Abriendo conexion segura...';
+      const res = await fetch('/api/onboard/' + onboardToken + '/create_link_token', { method: 'POST' });
+      const data = await res.json();
+      if (!data.link_token) {
+        statusEl.textContent = 'No se pudo iniciar. Intenta de nuevo.';
+        return;
+      }
+
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: async (public_token) => {
+          statusEl.textContent = 'Conectando, un momento...';
+          await fetch('/api/onboard/' + onboardToken + '/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_token }),
+          });
+          connectBtn.style.display = 'none';
+          statusEl.innerHTML = '<span class="ok">&#10003; Listo. Tus datos se cargaron correctamente.</span><br>Ya podes cerrar esta pagina.';
+        },
+        onExit: (err) => {
+          if (err) statusEl.textContent = 'Se cerro sin completar la conexion.';
+          else statusEl.textContent = '';
+        },
+      });
+
+      handler.open();
+    });
+
+    init();
+  </script>
+</body>
+</html>
