@@ -5,17 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bluemax - Panel</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 840px; margin: 40px auto; padding: 0 16px; color: #111; }
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #111; }
     h1 { margin-bottom: 4px; }
-    h3 { margin-top: 28px; }
+    h3 { margin-top: 28px; margin-bottom: 4px; }
     button { padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #f7f7f7; }
     button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
     button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; }
     input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { color: #555; font-weight: 600; }
     .debito { color: #b91c1c; }
     .credito { color: #15803d; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
     .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
     .badge.ok { background: #dcfce7; color: #15803d; }
     .badge.pend { background: #fef9c3; color: #a16207; }
@@ -24,6 +26,18 @@
     .hidden { display: none; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .spread { justify-content: space-between; }
+    /* Tarjetas de resumen */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+    .tile { border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
+    .tile .label { font-size: 12px; color: #666; }
+    .tile .value { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .tile .value.deb { color: #b91c1c; }
+    .tile .value.cred { color: #15803d; }
+    /* Avatar del cliente */
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #2563eb; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+    .head { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .filtros { margin-top: 12px; gap: 10px; }
+    .filtros label { font-size: 13px; color: #555; }
   </style>
 </head>
 <body>
@@ -50,14 +64,21 @@
       <input id="nuevo-email" placeholder="Email (opcional)">
       <button class="primary" id="add-btn">Agregar cliente</button>
     </div>
+    <input id="buscador" placeholder="Buscar cliente..." style="width:100%;margin-top:12px">
     <div id="clientes-lista"></div>
   </section>
 
   <!-- ================= DETALLE DE CLIENTE ================= -->
   <section id="screen-detalle" class="hidden">
     <button class="link" id="volver-btn">&larr; Volver a clientes</button>
-    <h1 id="detalle-nombre"></h1>
-    <div id="detalle-estado" class="muted"></div>
+    <div class="head">
+      <span class="avatar" id="detalle-avatar"></span>
+      <div>
+        <h1 id="detalle-nombre" style="margin:0"></h1>
+        <div id="detalle-sub" class="muted"></div>
+      </div>
+    </div>
+    <div id="detalle-estado" class="muted" style="margin-top:8px"></div>
 
     <div class="row" style="margin-top:12px">
       <button id="link-btn">Generar link para el cliente</button>
@@ -65,19 +86,33 @@
     </div>
     <div id="link-box" class="muted" style="margin-top:8px"></div>
 
+    <!-- Resumen -->
+    <div id="tiles" class="tiles hidden"></div>
+
     <h3>Cuentas</h3>
     <div id="cuentas-box" class="muted">Sin datos todavia.</div>
 
-    <h3>Transacciones</h3>
+    <h3>Movimientos</h3>
+    <div class="row filtros">
+      <label>Desde <input type="date" id="f-desde"></label>
+      <label>Hasta <input type="date" id="f-hasta"></label>
+      <button id="aplicar-btn">Aplicar</button>
+      <button id="limpiar-btn">Limpiar</button>
+      <button class="primary" id="exportar-btn">Exportar CSV</button>
+    </div>
     <div id="tx-box" class="muted">Sin datos todavia.</div>
   </section>
 
   <script>
     let token = localStorage.getItem('adminToken') || null;
     let clienteActual = null;
+    let nombreActual = '';
     let pollTimer = null;
+    let datosCliente = { accounts: [], transactions: [] }; // ultimo dato cargado
+    let clientesCache = [];
 
     const $ = (id) => document.getElementById(id);
+    const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
     function show(screen) {
       ['screen-login', 'screen-clientes', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
@@ -121,13 +156,25 @@
       if (data.error) { // sesion vencida
         token = null; localStorage.removeItem('adminToken'); show('screen-login'); return;
       }
+      clientesCache = data.clientes;
+      renderClientes();
+    }
+
+    function renderClientes() {
+      const filtro = $('buscador').value.trim().toLowerCase();
+      const lista = clientesCache.filter((c) =>
+        c.nombre.toLowerCase().includes(filtro) || (c.email || '').toLowerCase().includes(filtro));
       const cont = $('clientes-lista');
       cont.innerHTML = '';
-      if (!data.clientes.length) {
+      if (!clientesCache.length) {
         cont.innerHTML = '<p class="muted">Todavia no hay clientes. Agrega el primero arriba.</p>';
         return;
       }
-      data.clientes.forEach((c) => {
+      if (!lista.length) {
+        cont.innerHTML = '<p class="muted">Ningun cliente coincide con la busqueda.</p>';
+        return;
+      }
+      lista.forEach((c) => {
         const div = document.createElement('div');
         div.className = 'card';
         const badge = c.conectado
@@ -136,14 +183,16 @@
         div.innerHTML = `
           <div>
             <strong>${c.nombre}</strong> ${badge}<br>
-            <span class="muted">${c.email || 'sin email'} &middot; ${c.cantidadCuentas} cuentas &middot; ${c.cantidadTransacciones} transacciones</span>
+            <span class="muted">${c.email || 'sin email'} &middot; ${c.cantidadCuentas} cuentas &middot; ${c.cantidadTransacciones} movimientos</span>
           </div>
           <button>Ver</button>
         `;
-        div.querySelector('button').addEventListener('click', () => verCliente(c.id, c.nombre));
+        div.querySelector('button').addEventListener('click', () => verCliente(c.id, c.nombre, c.email));
         cont.appendChild(div);
       });
     }
+
+    $('buscador').addEventListener('input', renderClientes);
 
     $('add-btn').addEventListener('click', async () => {
       const nombre = $('nuevo-nombre').value.trim();
@@ -156,12 +205,18 @@
     });
 
     // ---------- Detalle de cliente ----------
-    async function verCliente(id, nombre) {
+    async function verCliente(id, nombre, email) {
       clienteActual = id;
+      nombreActual = nombre;
       show('screen-detalle');
       $('detalle-nombre').textContent = nombre;
+      $('detalle-sub').textContent = email || 'sin email';
+      $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
       $('detalle-estado').textContent = '';
       $('link-box').textContent = '';
+      $('tiles').classList.add('hidden');
+      $('f-desde').value = '';
+      $('f-hasta').value = '';
       $('cuentas-box').textContent = 'Cargando...';
       $('tx-box').textContent = 'Cargando...';
       await cargarDatos();
@@ -186,6 +241,9 @@
     });
 
     $('refresh-btn').addEventListener('click', cargarDatos);
+    $('aplicar-btn').addEventListener('click', renderMovimientos);
+    $('limpiar-btn').addEventListener('click', () => { $('f-desde').value = ''; $('f-hasta').value = ''; renderMovimientos(); });
+    $('exportar-btn').addEventListener('click', exportarCSV);
 
     async function cargarDatos() {
       const data = await api('/api/clientes/' + clienteActual + '/datos');
@@ -194,6 +252,7 @@
         $('tx-box').textContent = '';
         return;
       }
+      datosCliente = data;
       $('detalle-estado').textContent = data.conectado
         ? 'Banco conectado.'
         : 'El cliente todavia no conecto su banco. Genera el link y enviaselo.';
@@ -202,27 +261,89 @@
       if (!data.accounts.length) {
         $('cuentas-box').textContent = 'Sin cuentas todavia.';
       } else {
-        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th>Saldo</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
         data.accounts.forEach((a) => {
-          const saldo = a.saldo != null ? '$' + a.saldo.toFixed(2) + ' ' + a.moneda : '-';
-          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td>${saldo}</td></tr>`;
+          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
         });
         html += '</tbody></table>';
         $('cuentas-box').innerHTML = html;
       }
 
-      // Transacciones
-      if (!data.transactions.length) {
-        $('tx-box').textContent = 'Sin transacciones todavia.';
-      } else {
-        let html = '<p class="muted">' + data.transactions.length + ' transacciones</p>'
-          + '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th>Monto</th></tr></thead><tbody>';
-        data.transactions.forEach((t) => {
-          html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td class="${t.tipo}">${t.tipo}</td><td>$${t.monto.toFixed(2)}</td></tr>`;
-        });
-        html += '</tbody></table>';
-        $('tx-box').innerHTML = html;
+      renderMovimientos();
+    }
+
+    // Devuelve las transacciones filtradas por el rango de fechas elegido.
+    function transaccionesFiltradas() {
+      const desde = $('f-desde').value;
+      const hasta = $('f-hasta').value;
+      return datosCliente.transactions.filter((t) => {
+        if (desde && t.fecha < desde) return false;
+        if (hasta && t.fecha > hasta) return false;
+        return true;
+      });
+    }
+
+    function nombreCuenta(accountId) {
+      const a = datosCliente.accounts.find((x) => x.id === accountId);
+      return a ? a.nombre : '';
+    }
+
+    function renderMovimientos() {
+      const txs = transaccionesFiltradas();
+
+      // Tarjetas de resumen (sobre lo filtrado)
+      const totalDeb = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
+      const totalCred = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
+      const saldoTotal = datosCliente.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
+      if (datosCliente.transactions.length || datosCliente.accounts.length) {
+        $('tiles').classList.remove('hidden');
+        $('tiles').innerHTML = `
+          <div class="tile"><div class="label">Cuentas</div><div class="value">${datosCliente.accounts.length}</div></div>
+          <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
+          <div class="tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
+          <div class="tile"><div class="label">Debitos (gastos)</div><div class="value deb">${fmt(totalDeb)}</div></div>
+          <div class="tile"><div class="label">Creditos (ingresos)</div><div class="value cred">${fmt(totalCred)}</div></div>
+        `;
       }
+
+      // Tabla de movimientos
+      if (!datosCliente.transactions.length) {
+        $('tx-box').textContent = 'Sin movimientos todavia.';
+        return;
+      }
+      if (!txs.length) {
+        $('tx-box').textContent = 'No hay movimientos en el rango de fechas elegido.';
+        return;
+      }
+      let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
+      txs.forEach((t) => {
+        html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      $('tx-box').innerHTML = html;
+    }
+
+    // ---------- Exportar CSV ----------
+    function exportarCSV() {
+      const txs = transaccionesFiltradas();
+      if (!txs.length) { alert('No hay movimientos para exportar en ese rango.'); return; }
+
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const filas = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Monto']];
+      txs.forEach((t) => filas.push([t.fecha, t.descripcion, nombreCuenta(t.cuenta), t.tipo, t.monto.toFixed(2)]));
+      const csv = '﻿' + filas.map((f) => f.map(esc).join(',')).join('\r\n');
+
+      const desde = $('f-desde').value || 'inicio';
+      const hasta = $('f-hasta').value || 'hoy';
+      const nombre = nombreActual.replace(/[^a-z0-9]+/gi, '_');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `movimientos_${nombre}_${desde}_${hasta}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
     }
 
     // ---------- Arranque ----------
