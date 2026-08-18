@@ -12,6 +12,33 @@ transacciones (fecha, descripcion, monto, debito/credito) y cuentas con saldo.
 
 Cada usuario conecta su propio banco; el contador ve a todos.
 
+## Diagrama del flujo
+
+```mermaid
+flowchart TD
+    U1["Usuario final: se registra / ingresa en la pagina"]
+    U2["Usuario: click 'Conectar banco'"]
+    S1["Servidor: pide link_token a Plaid"]
+    P1["Plaid Link: el usuario se loguea a SU banco"]
+    S2["Servidor: cambia public_token por access_token<br/>(guardado contra ese usuario)"]
+    P2["Plaid avisa transacciones (webhook)"]
+    S3["Servidor: sincroniza (transactions/sync)<br/>guarda cuentas y movimientos del usuario"]
+    DB[("Datos guardados por usuario")]
+    U6["Usuario: ve su dashboard con graficos"]
+    C1["Contador: ingresa en /admin.html"]
+    C2["Contador: busca por usuario"]
+    C3["Contador: ve toda la data + export CSV"]
+
+    U1 --> U2 --> S1 --> P1 -->|public_token| S2 --> DB
+    P1 -.-> P2 -.->|webhook| S3 --> DB
+    DB --> U6
+    C1 --> C2 --> C3
+    DB --> C3
+```
+
+En una frase: **el usuario conecta su banco y ve un resumen visual; el servidor
+guarda sus datos; el contador entra por su panel y ve todo el detalle.**
+
 ---
 
 ## 1. Requisitos
