@@ -1,12 +1,16 @@
 # Demo Bluemax + Plaid
 
-Panel multi-cliente para conectar bancos con Plaid y leer transacciones
-(fecha, descripcion, monto, debito/credito) y cuentas con saldo.
+Plataforma con dos roles para conectar bancos de EE.UU. con Plaid y leer
+transacciones (fecha, descripcion, monto, debito/credito) y cuentas con saldo.
 
-Un **administrador** entra con login y gestiona varios **clientes**. Cada
-cliente conecta **su propio** banco desde un **link personal** que el admin le
-envia; cuando el cliente termina, sus datos quedan cargados contra su registro
-y el admin los ve en el panel.
+- **Usuario final** (`/`): se registra y loguea con su email. En su vista tiene
+  un boton para conectar su banco por Plaid y ve un **dashboard simple** con
+  graficos (saldo, ingresos vs gastos por mes, ultimos movimientos).
+- **Contador / admin** (`/admin.html`): loguea con la clave de contador,
+  **busca por usuario** y ve **toda la data** de cada uno (cuentas, movimientos,
+  filtro por fecha y export a CSV).
+
+Cada usuario conecta su propio banco; el contador ve a todos.
 
 ---
 
@@ -43,23 +47,23 @@ y el admin los ve en el panel.
 
 ## 3. Flujo de uso
 
-1. **Login** con la clave de `ADMIN_PASSWORD`.
-2. **Agregar cliente** (nombre + email opcional). Aparece como *Pendiente*.
-3. Entrar al cliente ("Ver") y apretar **"Generar link para el cliente"**.
-4. **Enviar ese link al cliente** (mail, WhatsApp, etc.).
-5. El cliente abre el link, aprieta **"Conectar banco"** y hace el login del
-   banco. Datos de prueba del sandbox de Plaid:
+**Como usuario final** (en `/`):
+1. Crear cuenta (nombre, email, clave) o ingresar.
+2. Apretar **"Conectar banco"**. Datos de prueba del sandbox de Plaid:
    - Banco: cualquiera, ej. **First Platypus Bank**
    - Usuario: `user_good`
    - Clave: `pass_good`
    - MFA/codigo si lo pide: `1234`
-6. El admin vuelve al panel: el cliente ahora figura **Conectado** y se ven sus
-   **cuentas** (con saldo) y sus **transacciones**. Lo mismo, por separado, para
-   cada cliente.
+3. Ver el dashboard: saldo, ingresos vs gastos por mes y ultimos movimientos.
 
-El panel se auto-refresca unos segundos al abrir un cliente, porque Plaid carga
-los ~24 meses de historial en segundo plano. Tambien hay un boton
-**"Actualizar datos"** para refrescar a mano.
+**Como contador** (en `/admin.html`):
+1. Ingresar con la clave de `ADMIN_PASSWORD`.
+2. Buscar un usuario por nombre o email.
+3. Ver sus **cuentas** y **movimientos**, filtrar por fecha y **exportar CSV**.
+
+Ambas vistas se auto-refrescan unos segundos al abrir, porque Plaid carga los
+~24 meses de historial en segundo plano. Hay un boton **"Actualizar"** para
+refrescar a mano.
 
 ## 4. ngrok (webhooks y links para el cliente)
 
@@ -99,29 +103,29 @@ actualiza `PLAID_WEBHOOK_URL` y volve a generar el link.
 
 ## 5. Endpoints
 
-**Admin (requieren header `Authorization: Bearer <token>`):**
+**Usuario final:**
 
 | Metodo | Ruta | Que hace |
 |--------|------|----------|
-| POST | `/api/admin/login` | Login, devuelve el token de sesion |
-| GET | `/api/clientes` | Lista de clientes con su estado |
-| POST | `/api/clientes` | Crea un cliente |
-| POST | `/api/clientes/:id/link` | Genera el link de onboarding del cliente |
-| GET | `/api/clientes/:id/datos` | Cuentas + transacciones del cliente |
+| POST | `/api/registro` | Crea cuenta de usuario, devuelve token de sesion |
+| POST | `/api/login` | Login de usuario, devuelve token de sesion |
+| POST | `/api/mi/create_link_token` | Inicia Plaid Link (requiere token) |
+| POST | `/api/mi/exchange` | Guarda el access_token del propio usuario |
+| GET | `/api/mi/datos` | Cuentas + transacciones del propio usuario |
 
-**Cliente (publicas, se identifican por el token del link):**
+**Contador / admin (requieren `Authorization: Bearer <token>`):**
 
 | Metodo | Ruta | Que hace |
 |--------|------|----------|
-| GET | `/api/onboard/:token` | Info del cliente (nombre, si ya conecto) |
-| POST | `/api/onboard/:token/create_link_token` | Inicia Plaid Link |
-| POST | `/api/onboard/:token/exchange` | Guarda el access_token del cliente |
+| POST | `/api/admin/login` | Login del contador |
+| GET | `/api/admin/usuarios?q=` | Lista/busca usuarios |
+| GET | `/api/admin/usuarios/:id/datos` | Cuentas + transacciones de un usuario |
 
 **Webhook:**
 
 | Metodo | Ruta | Que hace |
 |--------|------|----------|
-| POST | `/api/webhook` | Plaid avisa cambios; sincroniza al cliente por `item_id` |
+| POST | `/api/webhook` | Plaid avisa cambios; sincroniza al usuario por `item_id` |
 
 ## 6. Detalles tecnicos
 

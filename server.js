@@ -20,70 +20,58 @@ const configuration = new Configuration({
 const plaidClient = new PlaidApi(configuration);
 
 // ==========================================================================
-// Estado en memoria (solo para este demo). En un producto real todo esto va
-// en una base de datos.
+// Estado en memoria (solo para el demo). En produccion: base de datos.
 // ==========================================================================
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-const sesiones = new Set();   // tokens de sesion del admin logueado
-const clientes = {};          // clienteId -> datos del cliente (uno por cada cliente final)
-const onboardTokens = {};     // token del link -> clienteId
-const itemAcliente = {};      // plaid item_id -> clienteId (para saber a quien sincroniza cada webhook)
+const usuarios = {};          // userId -> datos del usuario final
+const emailIndex = {};        // email (lower) -> userId
+const sesionesUsuario = {};   // token de sesion -> userId
+const sesionesAdmin = new Set(); // tokens de sesion del admin/contador
+const itemAusuario = {};      // plaid item_id -> userId (para webhooks)
 
 function nuevoId() {
-  return crypto.randomBytes(8).toString('hex');
+  return crypto.randomBytes(12).toString('hex');
+}
+// Hash simple (demo). En produccion usar bcrypt/scrypt con salt por usuario.
+function hashPass(pass) {
+  return crypto.createHash('sha256').update(String(pass) + '|bluemax').digest('hex');
 }
 
 // ==========================================================================
-// Auth del administrador
+// Auth
 // ==========================================================================
+function requiereUsuario(req, res, next) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  const userId = sesionesUsuario[token];
+  if (!userId || !usuarios[userId]) return res.status(401).json({ error: 'No autorizado' });
+  req.usuario = usuarios[userId];
+  next();
+}
 function requiereAdmin(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const token = auth.replace('Bearer ', '');
-  if (!sesiones.has(token)) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!sesionesAdmin.has(token)) return res.status(401).json({ error: 'No autorizado' });
   next();
 }
 
-app.post('/api/admin/login', (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Clave incorrecta' });
+// ==========================================================================
+// Registro / Login del usuario final
+// ==========================================================================
+app.post('/api/registro', (req, res) => {
+  const { nombre, email, password } = req.body;
+  if (!nombre || !email || !password) {
+    return res.status(400).json({ error: 'Faltan datos (nombre, email y clave)' });
   }
-  const token = nuevoId();
-  sesiones.add(token);
-  res.json({ token });
-});
-
-// ==========================================================================
-// Clientes (rutas protegidas: solo el admin logueado)
-// ==========================================================================
-
-// Lista de clientes con su estado
-app.get('/api/clientes', requiereAdmin, (req, res) => {
-  const lista = Object.values(clientes).map((c) => ({
-    id: c.id,
-    nombre: c.nombre,
-    email: c.email,
-    conectado: c.conectado,
-    cantidadCuentas: c.accounts.length,
-    cantidadTransacciones: Object.keys(c.transactions).length,
-  }));
-  res.json({ clientes: lista });
-});
-
-// Crear un cliente nuevo
-app.post('/api/clientes', requiereAdmin, (req, res) => {
-  const { nombre, email } = req.body;
-  if (!nombre) {
-    return res.status(400).json({ error: 'Falta el nombre del cliente' });
+  const key = email.trim().toLowerCase();
+  if (emailIndex[key]) {
+    return res.status(409).json({ error: 'Ya existe una cuenta con ese email' });
   }
   const id = nuevoId();
-  clientes[id] = {
+  usuarios[id] = {
     id,
-    nombre,
-    email: email || '',
+    nombre: nombre.trim(),
+    email: key,
+    passwordHash: hashPass(password),
     accessToken: null,
     itemId: null,
     cursor: null,
@@ -91,73 +79,33 @@ app.post('/api/clientes', requiereAdmin, (req, res) => {
     accounts: [],
     conectado: false,
   };
-  res.json({ cliente: { id, nombre, email: email || '' } });
+  emailIndex[key] = id;
+
+  const token = nuevoId();
+  sesionesUsuario[token] = id;
+  res.json({ token, nombre: usuarios[id].nombre });
 });
 
-// Generar (o reutilizar) el link de onboarding para que el cliente conecte su banco.
-// La URL usa el host desde el que entraste: si abris el panel por la URL de ngrok,
-// el link generado tambien sale con el dominio publico y se lo podes mandar al cliente.
-app.post('/api/clientes/:id/link', requiereAdmin, (req, res) => {
-  const c = clientes[req.params.id];
-  if (!c) return res.status(404).json({ error: 'Cliente no existe' });
-
-  let token = Object.keys(onboardTokens).find((t) => onboardTokens[t] === c.id);
-  if (!token) {
-    token = nuevoId();
-    onboardTokens[token] = c.id;
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body;
+  const key = (email || '').trim().toLowerCase();
+  const id = emailIndex[key];
+  const u = id && usuarios[id];
+  if (!u || u.passwordHash !== hashPass(password)) {
+    return res.status(401).json({ error: 'Email o clave incorrectos' });
   }
-  const base = `${req.protocol}://${req.get('host')}`;
-  res.json({ url: `${base}/onboard.html?token=${token}` });
-});
-
-// Datos de un cliente: cuentas + transacciones (las trae el admin para verlas)
-app.get('/api/clientes/:id/datos', requiereAdmin, async (req, res) => {
-  const c = clientes[req.params.id];
-  if (!c) return res.status(404).json({ error: 'Cliente no existe' });
-
-  if (!c.accessToken) {
-    return res.json({ conectado: false, accounts: [], transactions: [] });
-  }
-
-  try {
-    await syncCliente(c);
-
-    const accountsResp = await plaidClient.accountsGet({ access_token: c.accessToken });
-    c.accounts = accountsResp.data.accounts.map(formatAccount);
-
-    const transactions = Object.values(c.transactions)
-      .map(formatTransaction)
-      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
-
-    res.json({ conectado: true, accounts: c.accounts, transactions });
-  } catch (err) {
-    console.error(err.response ? err.response.data : err);
-    res.status(500).json({ error: 'No se pudieron traer los datos del cliente' });
-  }
+  const token = nuevoId();
+  sesionesUsuario[token] = id;
+  res.json({ token, nombre: u.nombre });
 });
 
 // ==========================================================================
-// Onboarding del cliente final (rutas publicas: el cliente NO esta logueado,
-// se identifica por el token del link que le mandaron)
+// Rutas del propio usuario (ve/gestiona SOLO su cuenta)
 // ==========================================================================
-
-// Info basica para mostrar en la pagina del link
-app.get('/api/onboard/:token', (req, res) => {
-  const clienteId = onboardTokens[req.params.token];
-  const c = clienteId && clientes[clienteId];
-  if (!c) return res.status(404).json({ error: 'Link invalido o vencido' });
-  res.json({ nombre: c.nombre, conectado: c.conectado });
-});
-
-// El cliente pide el link_token para abrir Plaid Link
-app.post('/api/onboard/:token/create_link_token', async (req, res) => {
-  const clienteId = onboardTokens[req.params.token];
-  const c = clienteId && clientes[clienteId];
-  if (!c) return res.status(404).json({ error: 'Link invalido o vencido' });
-
+app.post('/api/mi/create_link_token', requiereUsuario, async (req, res) => {
   try {
     const response = await plaidClient.linkTokenCreate({
-      user: { client_user_id: c.id },
+      user: { client_user_id: req.usuario.id },
       client_name: 'Bluemax',
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
@@ -172,55 +120,89 @@ app.post('/api/onboard/:token/create_link_token', async (req, res) => {
   }
 });
 
-// Cuando el cliente termina el login, guardamos su access_token contra su registro
-app.post('/api/onboard/:token/exchange', async (req, res) => {
-  const clienteId = onboardTokens[req.params.token];
-  const c = clienteId && clientes[clienteId];
-  if (!c) return res.status(404).json({ error: 'Link invalido o vencido' });
-
+app.post('/api/mi/exchange', requiereUsuario, async (req, res) => {
   try {
     const { public_token } = req.body;
     const response = await plaidClient.itemPublicTokenExchange({ public_token });
-
-    c.accessToken = response.data.access_token;
-    c.itemId = response.data.item_id;
-    c.cursor = null;
-    c.transactions = {};
-    c.accounts = [];
-    c.conectado = true;
-    itemAcliente[c.itemId] = c.id;
-
+    const u = req.usuario;
+    u.accessToken = response.data.access_token;
+    u.itemId = response.data.item_id;
+    u.cursor = null;
+    u.transactions = {};
+    u.accounts = [];
+    u.conectado = true;
+    itemAusuario[u.itemId] = u.id;
     res.json({ ok: true });
   } catch (err) {
     console.error(err.response ? err.response.data : err);
-    res.status(500).json({ error: 'No se pudo intercambiar el public_token' });
+    res.status(500).json({ error: 'No se pudo conectar el banco' });
+  }
+});
+
+app.get('/api/mi/datos', requiereUsuario, async (req, res) => {
+  try {
+    const datos = await obtenerDatos(req.usuario);
+    res.json(Object.assign({ nombre: req.usuario.nombre }, datos));
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer tus datos' });
   }
 });
 
 // ==========================================================================
-// Webhook: Plaid nos avisa cuando hay transacciones nuevas/cambios.
-// Usamos el item_id para sincronizar al CLIENTE correcto.
+// Admin / contador: ve a TODOS los usuarios y su data completa
+// ==========================================================================
+app.post('/api/admin/login', (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Clave incorrecta' });
+  }
+  const token = nuevoId();
+  sesionesAdmin.add(token);
+  res.json({ token });
+});
+
+app.get('/api/admin/usuarios', requiereAdmin, (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  const lista = Object.values(usuarios)
+    .filter((u) => !q || u.nombre.toLowerCase().includes(q) || u.email.includes(q))
+    .map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+      email: u.email,
+      conectado: u.conectado,
+      cantidadCuentas: u.accounts.length,
+      cantidadTransacciones: Object.keys(u.transactions).length,
+    }));
+  res.json({ usuarios: lista });
+});
+
+app.get('/api/admin/usuarios/:id/datos', requiereAdmin, async (req, res) => {
+  const u = usuarios[req.params.id];
+  if (!u) return res.status(404).json({ error: 'Usuario no existe' });
+  try {
+    const datos = await obtenerDatos(u);
+    res.json(Object.assign({ nombre: u.nombre, email: u.email }, datos));
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer los datos del usuario' });
+  }
+});
+
+// ==========================================================================
+// Webhook: sincroniza al usuario dueño del item_id
 // ==========================================================================
 app.post('/api/webhook', async (req, res) => {
   const { webhook_type, webhook_code, item_id } = req.body;
   console.log('Webhook recibido:', webhook_type, webhook_code, 'item:', item_id);
+  res.json({ ok: true });
 
-  res.json({ ok: true }); // respondemos rapido para no bloquear el reintento de Plaid
-
-  const codigosDeTransacciones = [
-    'SYNC_UPDATES_AVAILABLE',
-    'INITIAL_UPDATE',
-    'HISTORICAL_UPDATE',
-    'DEFAULT_UPDATE',
-  ];
-
-  if (webhook_type === 'TRANSACTIONS' && codigosDeTransacciones.includes(webhook_code)) {
-    const clienteId = itemAcliente[item_id];
-    const c = clienteId && clientes[clienteId];
-    if (!c) return;
+  const codigos = ['SYNC_UPDATES_AVAILABLE', 'INITIAL_UPDATE', 'HISTORICAL_UPDATE', 'DEFAULT_UPDATE'];
+  if (webhook_type === 'TRANSACTIONS' && codigos.includes(webhook_code)) {
+    const u = usuarios[itemAusuario[item_id]];
+    if (!u) return;
     try {
-      await syncCliente(c);
-      console.log('Cliente', c.nombre, 'sincronizado por webhook. Transacciones:', Object.keys(c.transactions).length);
+      await syncUsuario(u);
+      console.log('Usuario', u.nombre, 'sincronizado por webhook. Transacciones:', Object.keys(u.transactions).length);
     } catch (err) {
       console.error(err.response ? err.response.data : err);
     }
@@ -231,16 +213,25 @@ app.post('/api/webhook', async (req, res) => {
 // Helpers
 // ==========================================================================
 
-// Sincroniza las transacciones de un cliente con /transactions/sync.
-// Acumula added/modified/removed y recien aplica cuando la paginacion termino.
-// Si los datos cambian a mitad de la paginacion, descarta lo parcial y reintenta.
-async function syncCliente(c) {
-  if (!c.accessToken) return;
+// Sincroniza + devuelve cuentas y transacciones de un usuario.
+async function obtenerDatos(u) {
+  if (!u.accessToken) return { conectado: false, accounts: [], transactions: [] };
+  await syncUsuario(u);
+  const accountsResp = await plaidClient.accountsGet({ access_token: u.accessToken });
+  u.accounts = accountsResp.data.accounts.map(formatAccount);
+  const transactions = Object.values(u.transactions)
+    .map(formatTransaction)
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  return { conectado: true, accounts: u.accounts, transactions };
+}
 
+// /transactions/sync con acumulacion y reintento ante mutacion durante la paginacion.
+async function syncUsuario(u) {
+  if (!u.accessToken) return;
   const MAX_REINTENTOS = 3;
 
   for (let intento = 0; intento < MAX_REINTENTOS; intento++) {
-    let cursor = c.cursor;
+    let cursor = u.cursor;
     const added = [];
     const modified = [];
     const removed = [];
@@ -249,23 +240,20 @@ async function syncCliente(c) {
       let hasMore = true;
       while (hasMore) {
         const response = await plaidClient.transactionsSync({
-          access_token: c.accessToken,
+          access_token: u.accessToken,
           cursor: cursor || undefined,
         });
         const data = response.data;
-
         added.push(...data.added);
         modified.push(...data.modified);
         removed.push(...data.removed);
-
         hasMore = data.has_more;
         cursor = data.next_cursor;
       }
-
-      added.forEach((t) => { c.transactions[t.transaction_id] = t; });
-      modified.forEach((t) => { c.transactions[t.transaction_id] = t; });
-      removed.forEach((r) => { delete c.transactions[r.transaction_id]; });
-      c.cursor = cursor;
+      added.forEach((t) => { u.transactions[t.transaction_id] = t; });
+      modified.forEach((t) => { u.transactions[t.transaction_id] = t; });
+      removed.forEach((r) => { delete u.transactions[r.transaction_id]; });
+      u.cursor = cursor;
       return;
     } catch (err) {
       const code = err.response && err.response.data && err.response.data.error_code;
@@ -277,8 +265,7 @@ async function syncCliente(c) {
   }
 }
 
-// En cuentas "depository": amount > 0 = plata que SALE (debito/gasto)
-//                          amount < 0 = plata que ENTRA (credito/deposito)
+// En cuentas "depository": amount > 0 = sale (debito/gasto), amount < 0 = entra (credito/ingreso)
 function formatTransaction(t) {
   return {
     fecha: t.date,

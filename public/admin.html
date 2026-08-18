@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bluemax - Contador</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #111; }
+    h1 { margin-bottom: 4px; }
+    h3 { margin-top: 28px; margin-bottom: 4px; }
+    button { padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #f7f7f7; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; }
+    input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { color: #555; font-weight: 600; }
+    .debito { color: #b91c1c; }
+    .credito { color: #15803d; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+    .badge.ok { background: #dcfce7; color: #15803d; }
+    .badge.pend { background: #fef9c3; color: #a16207; }
+    .card { border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .muted { color: #666; font-size: 13px; }
+    .hidden { display: none; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spread { justify-content: space-between; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+    .tile { border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
+    .tile .label { font-size: 12px; color: #666; }
+    .tile .value { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .tile .value.deb { color: #b91c1c; }
+    .tile .value.cred { color: #15803d; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #2563eb; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+    .head { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .filtros { margin-top: 12px; gap: 10px; }
+    .filtros label { font-size: 13px; color: #555; }
+  </style>
+</head>
+<body>
+
+  <!-- ================= LOGIN CONTADOR ================= -->
+  <section id="screen-login">
+    <h1>Bluemax - Contador</h1>
+    <p class="muted">Panel para ver a todos tus usuarios y sus datos.</p>
+    <div class="row">
+      <input id="login-pass" type="password" placeholder="Clave de contador">
+      <button class="primary" id="login-btn">Ingresar</button>
+    </div>
+    <div id="login-error" class="muted" style="color:#b91c1c"></div>
+    <p style="margin-top:20px"><a class="link" href="/">&larr; Volver al inicio</a></p>
+  </section>
+
+  <!-- ================= LISTA DE USUARIOS ================= -->
+  <section id="screen-usuarios" class="hidden">
+    <div class="row spread">
+      <h1>Usuarios</h1>
+      <button class="link" id="logout-btn">Salir</button>
+    </div>
+    <input id="buscador" placeholder="Buscar usuario por nombre o email..." style="width:100%;margin-top:12px">
+    <div id="usuarios-lista"></div>
+  </section>
+
+  <!-- ================= DETALLE DE USUARIO ================= -->
+  <section id="screen-detalle" class="hidden">
+    <button class="link" id="volver-btn">&larr; Volver a usuarios</button>
+    <div class="head">
+      <span class="avatar" id="detalle-avatar"></span>
+      <div>
+        <h1 id="detalle-nombre" style="margin:0"></h1>
+        <div id="detalle-sub" class="muted"></div>
+      </div>
+    </div>
+    <div id="detalle-estado" class="muted" style="margin-top:8px"></div>
+    <button id="refresh-btn" style="margin-top:12px">Actualizar datos</button>
+
+    <div id="tiles" class="tiles hidden"></div>
+
+    <h3>Cuentas</h3>
+    <div id="cuentas-box" class="muted">Sin datos todavia.</div>
+
+    <h3>Movimientos</h3>
+    <div class="row filtros">
+      <label>Desde <input type="date" id="f-desde"></label>
+      <label>Hasta <input type="date" id="f-hasta"></label>
+      <button id="aplicar-btn">Aplicar</button>
+      <button id="limpiar-btn">Limpiar</button>
+      <button class="primary" id="exportar-btn">Exportar CSV</button>
+    </div>
+    <div id="tx-box" class="muted">Sin datos todavia.</div>
+  </section>
+
+  <script>
+    let token = localStorage.getItem('adminToken') || null;
+    let usuarioActual = null;
+    let nombreActual = '';
+    let pollTimer = null;
+    let datos = { accounts: [], transactions: [] };
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+    function show(screen) {
+      ['screen-login', 'screen-usuarios', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
+      $(screen).classList.remove('hidden');
+    }
+
+    async function api(path, opts = {}) {
+      opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(path, opts);
+      return res.json();
+    }
+
+    // ---------- Login ----------
+    $('login-btn').addEventListener('click', async () => {
+      const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: $('login-pass').value }) });
+      if (data.token) {
+        token = data.token; localStorage.setItem('adminToken', token);
+        $('login-pass').value = ''; $('login-error').textContent = '';
+        irAUsuarios();
+      } else {
+        $('login-error').textContent = data.error || 'Error al ingresar';
+      }
+    });
+    $('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); });
+
+    $('logout-btn').addEventListener('click', () => {
+      token = null; localStorage.removeItem('adminToken'); show('screen-login');
+    });
+
+    // ---------- Lista de usuarios ----------
+    async function irAUsuarios() {
+      if (pollTimer) clearInterval(pollTimer);
+      show('screen-usuarios');
+      buscarUsuarios();
+    }
+
+    let debounce = null;
+    $('buscador').addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(buscarUsuarios, 250); });
+
+    async function buscarUsuarios() {
+      const q = encodeURIComponent($('buscador').value.trim());
+      const data = await api('/api/admin/usuarios?q=' + q);
+      if (data.error) { token = null; localStorage.removeItem('adminToken'); show('screen-login'); return; }
+      const cont = $('usuarios-lista');
+      cont.innerHTML = '';
+      if (!data.usuarios.length) {
+        cont.innerHTML = '<p class="muted">No hay usuarios que coincidan.</p>';
+        return;
+      }
+      data.usuarios.forEach((u) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        const badge = u.conectado ? '<span class="badge ok">Conectado</span>' : '<span class="badge pend">Sin banco</span>';
+        div.innerHTML = `
+          <div>
+            <strong>${u.nombre}</strong> ${badge}<br>
+            <span class="muted">${u.email} &middot; ${u.cantidadCuentas} cuentas &middot; ${u.cantidadTransacciones} movimientos</span>
+          </div>
+          <button>Ver</button>
+        `;
+        div.querySelector('button').addEventListener('click', () => verUsuario(u.id, u.nombre, u.email));
+        cont.appendChild(div);
+      });
+    }
+
+    // ---------- Detalle ----------
+    async function verUsuario(id, nombre, email) {
+      usuarioActual = id; nombreActual = nombre;
+      show('screen-detalle');
+      $('detalle-nombre').textContent = nombre;
+      $('detalle-sub').textContent = email || '';
+      $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
+      $('detalle-estado').textContent = '';
+      $('tiles').classList.add('hidden');
+      $('f-desde').value = ''; $('f-hasta').value = '';
+      $('cuentas-box').textContent = 'Cargando...';
+      $('tx-box').textContent = 'Cargando...';
+      await cargarDatos();
+      if (pollTimer) clearInterval(pollTimer);
+      let n = 0;
+      pollTimer = setInterval(async () => { n++; await cargarDatos(); if (n >= 12) clearInterval(pollTimer); }, 5000);
+    }
+
+    $('volver-btn').addEventListener('click', irAUsuarios);
+    $('refresh-btn').addEventListener('click', cargarDatos);
+    $('aplicar-btn').addEventListener('click', renderMovimientos);
+    $('limpiar-btn').addEventListener('click', () => { $('f-desde').value = ''; $('f-hasta').value = ''; renderMovimientos(); });
+    $('exportar-btn').addEventListener('click', exportarCSV);
+
+    async function cargarDatos() {
+      const data = await api('/api/admin/usuarios/' + usuarioActual + '/datos');
+      if (data.error) { $('cuentas-box').textContent = data.error; $('tx-box').textContent = ''; return; }
+      datos = data;
+      $('detalle-estado').textContent = data.conectado ? 'Banco conectado.' : 'El usuario todavia no conecto su banco.';
+
+      if (!data.accounts.length) {
+        $('cuentas-box').textContent = 'Sin cuentas todavia.';
+      } else {
+        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
+        data.accounts.forEach((a) => {
+          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        $('cuentas-box').innerHTML = html;
+      }
+      renderMovimientos();
+    }
+
+    function transaccionesFiltradas() {
+      const desde = $('f-desde').value, hasta = $('f-hasta').value;
+      return datos.transactions.filter((t) => {
+        if (desde && t.fecha < desde) return false;
+        if (hasta && t.fecha > hasta) return false;
+        return true;
+      });
+    }
+    function nombreCuenta(id) { const a = datos.accounts.find((x) => x.id === id); return a ? a.nombre : ''; }
+
+    function renderMovimientos() {
+      const txs = transaccionesFiltradas();
+      const totalDeb = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
+      const totalCred = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
+      const saldoTotal = datos.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
+
+      if (datos.transactions.length || datos.accounts.length) {
+        $('tiles').classList.remove('hidden');
+        $('tiles').innerHTML = `
+          <div class="tile"><div class="label">Cuentas</div><div class="value">${datos.accounts.length}</div></div>
+          <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
+          <div class="tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
+          <div class="tile"><div class="label">Debitos (gastos)</div><div class="value deb">${fmt(totalDeb)}</div></div>
+          <div class="tile"><div class="label">Creditos (ingresos)</div><div class="value cred">${fmt(totalCred)}</div></div>
+        `;
+      }
+
+      if (!datos.transactions.length) { $('tx-box').textContent = 'Sin movimientos todavia.'; return; }
+      if (!txs.length) { $('tx-box').textContent = 'No hay movimientos en el rango elegido.'; return; }
+      let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
+      txs.forEach((t) => {
+        html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      $('tx-box').innerHTML = html;
+    }
+
+    function exportarCSV() {
+      const txs = transaccionesFiltradas();
+      if (!txs.length) { alert('No hay movimientos para exportar en ese rango.'); return; }
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const filas = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Monto']];
+      txs.forEach((t) => filas.push([t.fecha, t.descripcion, nombreCuenta(t.cuenta), t.tipo, t.monto.toFixed(2)]));
+      const csv = '﻿' + filas.map((f) => f.map(esc).join(',')).join('\r\n');
+      const desde = $('f-desde').value || 'inicio', hasta = $('f-hasta').value || 'hoy';
+      const nombre = nombreActual.replace(/[^a-z0-9]+/gi, '_');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `movimientos_${nombre}_${desde}_${hasta}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ---------- Arranque ----------
+    if (token) irAUsuarios(); else show('screen-login');
+  </script>
+</body>
+</html>
