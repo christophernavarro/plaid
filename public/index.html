@@ -2,85 +2,272 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Bluemax - Demo Plaid</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bluemax</title>
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
-    button { padding: 10px 18px; font-size: 15px; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
-    .debito { color: #b91c1c; }
-    .credito { color: #15803d; }
-    #status { margin-top: 12px; color: #555; }
+    body { font-family: system-ui, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 16px; color: #111; }
+    h1 { margin-bottom: 4px; }
+    h3 { margin-top: 28px; margin-bottom: 4px; }
+    button { padding: 10px 18px; font-size: 15px; cursor: pointer; border: 1px solid #ccc; border-radius: 8px; background: #f7f7f7; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; font-size: 14px; }
+    input { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 8px; }
+    .muted { color: #666; font-size: 13px; }
+    .hidden { display: none; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spread { justify-content: space-between; }
+    .box { max-width: 380px; }
+    .tabs { display: flex; gap: 16px; margin-bottom: 8px; }
+    .tabs button.active { font-weight: 700; text-decoration: none; color: #111; }
+    .error { color: #b91c1c; font-size: 13px; margin-top: 8px; }
+    /* Dashboard */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+    .tile { border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; }
+    .tile .label { font-size: 12px; color: #666; }
+    .tile .value { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .tile .value.deb { color: #b91c1c; }
+    .tile .value.cred { color: #15803d; }
+    .chart { border: 1px solid #eee; border-radius: 10px; padding: 16px; margin-top: 12px; }
+    .leyenda { display: flex; gap: 16px; font-size: 13px; margin-top: 8px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+    ul.mov { list-style: none; padding: 0; margin-top: 8px; }
+    ul.mov li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .connect-box { border: 1px dashed #c7d2fe; background: #f5f8ff; border-radius: 12px; padding: 24px; text-align: center; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Bluemax - Demo Plaid</h1>
-  <p>Conecta una cuenta de banco (sandbox) y trae debitos y creditos.</p>
-  <button id="connect-btn">Conectar banco</button>
-  <div id="status"></div>
-  <table id="tx-table" style="display:none">
-    <thead>
-      <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th>Monto</th></tr>
-    </thead>
-    <tbody id="tx-body"></tbody>
-  </table>
+
+  <!-- ================= AUTH (usuario) ================= -->
+  <section id="screen-auth">
+    <h1>Bluemax</h1>
+    <p class="muted">Conecta tu banco y ve tus finanzas en un solo lugar.</p>
+
+    <div class="box" style="margin-top:20px">
+      <div class="tabs">
+        <button class="link active" id="tab-login">Ingresar</button>
+        <button class="link" id="tab-registro">Crear cuenta</button>
+      </div>
+
+      <!-- Login -->
+      <div id="form-login">
+        <input id="login-email" type="email" placeholder="Email">
+        <input id="login-pass" type="password" placeholder="Clave">
+        <button class="primary" id="login-btn" style="margin-top:12px;width:100%">Ingresar</button>
+      </div>
+
+      <!-- Registro -->
+      <div id="form-registro" class="hidden">
+        <input id="reg-nombre" placeholder="Nombre y apellido">
+        <input id="reg-email" type="email" placeholder="Email">
+        <input id="reg-pass" type="password" placeholder="Elegi una clave">
+        <button class="primary" id="reg-btn" style="margin-top:12px;width:100%">Crear cuenta</button>
+      </div>
+
+      <div id="auth-error" class="error"></div>
+    </div>
+
+    <p style="margin-top:24px"><a class="link" href="/admin.html">Acceso contador &rarr;</a></p>
+  </section>
+
+  <!-- ================= DASHBOARD (usuario) ================= -->
+  <section id="screen-dash" class="hidden">
+    <div class="row spread">
+      <h1 id="dash-hola"></h1>
+      <button class="link" id="logout-btn">Salir</button>
+    </div>
+
+    <!-- Sin banco conectado -->
+    <div id="sin-banco" class="connect-box hidden">
+      <p>Todavia no conectaste tu banco.</p>
+      <button class="primary" id="connect-btn">Conectar banco</button>
+      <p class="muted" id="connect-status" style="margin-top:10px"></p>
+    </div>
+
+    <!-- Con banco conectado -->
+    <div id="con-banco" class="hidden">
+      <div id="tiles" class="tiles"></div>
+
+      <div class="chart">
+        <strong>Ingresos vs Gastos por mes</strong>
+        <div id="grafico"></div>
+        <div class="leyenda">
+          <span><span class="dot" style="background:#15803d"></span>Ingresos</span>
+          <span><span class="dot" style="background:#b91c1c"></span>Gastos</span>
+        </div>
+      </div>
+
+      <h3>Ultimos movimientos</h3>
+      <ul class="mov" id="ultimos"></ul>
+      <p class="muted" id="dash-nota"></p>
+      <button id="dash-refresh" style="margin-top:6px">Actualizar</button>
+    </div>
+  </section>
 
   <script>
-    const statusEl = document.getElementById('status');
+    let token = localStorage.getItem('userToken') || null;
+    let pollTimer = null;
 
-    async function createLinkToken() {
-      const res = await fetch('/api/create_link_token', { method: 'POST' });
-      const data = await res.json();
-      return data.link_token;
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+    function show(screen) {
+      ['screen-auth', 'screen-dash'].forEach((s) => $(s).classList.add('hidden'));
+      $(screen).classList.remove('hidden');
     }
 
-    async function loadTransactions() {
-      statusEl.textContent = 'Cargando transacciones...';
-      const res = await fetch('/api/transactions');
-      const data = await res.json();
-      if (data.error) {
-        statusEl.textContent = 'Error: ' + data.error;
+    async function api(path, opts = {}) {
+      opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(path, opts);
+      return res.json();
+    }
+
+    // ---------- Tabs auth ----------
+    $('tab-login').addEventListener('click', () => {
+      $('tab-login').classList.add('active'); $('tab-registro').classList.remove('active');
+      $('form-login').classList.remove('hidden'); $('form-registro').classList.add('hidden');
+      $('auth-error').textContent = '';
+    });
+    $('tab-registro').addEventListener('click', () => {
+      $('tab-registro').classList.add('active'); $('tab-login').classList.remove('active');
+      $('form-registro').classList.remove('hidden'); $('form-login').classList.add('hidden');
+      $('auth-error').textContent = '';
+    });
+
+    // ---------- Login / Registro ----------
+    $('login-btn').addEventListener('click', async () => {
+      const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ email: $('login-email').value, password: $('login-pass').value }) });
+      manejarAuth(data);
+    });
+    $('reg-btn').addEventListener('click', async () => {
+      const data = await api('/api/registro', { method: 'POST', body: JSON.stringify({ nombre: $('reg-nombre').value, email: $('reg-email').value, password: $('reg-pass').value }) });
+      manejarAuth(data);
+    });
+    $('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); });
+
+    function manejarAuth(data) {
+      if (data.token) {
+        token = data.token;
+        localStorage.setItem('userToken', token);
+        $('auth-error').textContent = '';
+        irADashboard();
+      } else {
+        $('auth-error').textContent = data.error || 'Error';
+      }
+    }
+
+    $('logout-btn').addEventListener('click', () => {
+      token = null; localStorage.removeItem('userToken');
+      if (pollTimer) clearInterval(pollTimer);
+      show('screen-auth');
+    });
+
+    // ---------- Dashboard ----------
+    async function irADashboard() {
+      show('screen-dash');
+      await cargar();
+    }
+
+    $('dash-refresh').addEventListener('click', cargar);
+
+    async function cargar() {
+      const data = await api('/api/mi/datos');
+      if (data.error) { token = null; localStorage.removeItem('userToken'); show('screen-auth'); return; }
+      $('dash-hola').textContent = 'Hola, ' + data.nombre;
+
+      if (!data.conectado) {
+        $('sin-banco').classList.remove('hidden');
+        $('con-banco').classList.add('hidden');
         return;
       }
-      const tbody = document.getElementById('tx-body');
-      tbody.innerHTML = '';
-      data.transactions.forEach((t) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${t.fecha}</td>
-          <td>${t.descripcion}</td>
-          <td class="${t.tipo}">${t.tipo}</td>
-          <td>$${t.monto.toFixed(2)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-      document.getElementById('tx-table').style.display = 'table';
-      statusEl.textContent = `${data.transactions.length} transacciones encontradas.`;
+      $('sin-banco').classList.add('hidden');
+      $('con-banco').classList.remove('hidden');
+      render(data);
     }
 
-    document.getElementById('connect-btn').addEventListener('click', async () => {
-      statusEl.textContent = 'Abriendo Plaid Link...';
-      const linkToken = await createLinkToken();
+    function render(data) {
+      const txs = data.transactions;
+      const ingresos = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
+      const gastos = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
+      const saldo = data.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
+
+      $('tiles').innerHTML = `
+        <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldo)}</div></div>
+        <div class="tile"><div class="label">Ingresos (historico)</div><div class="value cred">${fmt(ingresos)}</div></div>
+        <div class="tile"><div class="label">Gastos (historico)</div><div class="value deb">${fmt(gastos)}</div></div>
+        <div class="tile"><div class="label">Cuentas</div><div class="value">${data.accounts.length}</div></div>
+      `;
+
+      $('grafico').innerHTML = graficoMensual(txs);
+
+      // Ultimos 8 movimientos (vista simple)
+      const ult = txs.slice(0, 8).map((t) => {
+        const signo = t.tipo === 'credito' ? '+' : '-';
+        const color = t.tipo === 'credito' ? '#15803d' : '#b91c1c';
+        return `<li><span>${t.fecha} &middot; ${t.descripcion}</span><span style="color:${color};font-variant-numeric:tabular-nums">${signo}${fmt(t.monto)}</span></li>`;
+      }).join('');
+      $('ultimos').innerHTML = ult;
+      $('dash-nota').textContent = txs.length + ' movimientos en total en tu cuenta.';
+    }
+
+    // Grafico de barras (SVG puro) de ingresos vs gastos por mes, ultimos 6 meses.
+    function graficoMensual(txs) {
+      const meses = {}; // 'YYYY-MM' -> {ing, gas}
+      txs.forEach((t) => {
+        const m = t.fecha.slice(0, 7);
+        if (!meses[m]) meses[m] = { ing: 0, gas: 0 };
+        if (t.tipo === 'credito') meses[m].ing += t.monto; else meses[m].gas += t.monto;
+      });
+      const claves = Object.keys(meses).sort().slice(-6);
+      if (!claves.length) return '<p class="muted">Sin datos para graficar.</p>';
+
+      const max = Math.max(...claves.flatMap((k) => [meses[k].ing, meses[k].gas]), 1);
+      const W = 640, H = 220, padB = 30, padT = 10;
+      const anchoGrupo = W / claves.length;
+      const wBarra = Math.min(26, anchoGrupo / 3);
+
+      let barras = '';
+      claves.forEach((k, i) => {
+        const cx = i * anchoGrupo + anchoGrupo / 2;
+        const hIng = (meses[k].ing / max) * (H - padB - padT);
+        const hGas = (meses[k].gas / max) * (H - padB - padT);
+        barras += `
+          <rect x="${cx - wBarra - 2}" y="${H - padB - hIng}" width="${wBarra}" height="${hIng}" fill="#15803d" rx="3"></rect>
+          <rect x="${cx + 2}" y="${H - padB - hGas}" width="${wBarra}" height="${hGas}" fill="#b91c1c" rx="3"></rect>
+          <text x="${cx}" y="${H - padB + 16}" font-size="11" fill="#666" text-anchor="middle">${k.slice(5)}/${k.slice(2, 4)}</text>
+        `;
+      });
+      return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:8px">
+        <line x1="0" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="#e5e5e5"></line>
+        ${barras}
+      </svg>`;
+    }
+
+    // ---------- Conectar banco ----------
+    $('connect-btn').addEventListener('click', async () => {
+      $('connect-status').textContent = 'Abriendo conexion segura...';
+      const data = await api('/api/mi/create_link_token', { method: 'POST' });
+      if (!data.link_token) { $('connect-status').textContent = 'No se pudo iniciar. Intenta de nuevo.'; return; }
 
       const handler = Plaid.create({
-        token: linkToken,
-        onSuccess: async (public_token, metadata) => {
-          statusEl.textContent = 'Cuenta conectada. Intercambiando token...';
-          await fetch('/api/exchange_public_token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ public_token }),
-          });
-          await loadTransactions();
+        token: data.link_token,
+        onSuccess: async (public_token) => {
+          $('connect-status').textContent = 'Conectando, un momento...';
+          await api('/api/mi/exchange', { method: 'POST', body: JSON.stringify({ public_token }) });
+          await cargar();
+          // Auto-refresco mientras Plaid completa el historial en segundo plano.
+          if (pollTimer) clearInterval(pollTimer);
+          let n = 0;
+          pollTimer = setInterval(async () => { n++; await cargar(); if (n >= 12) clearInterval(pollTimer); }, 5000);
         },
-        onExit: (err, metadata) => {
-          if (err) statusEl.textContent = 'Se cerro Plaid Link con un error.';
-        },
+        onExit: (err) => { $('connect-status').textContent = err ? 'Se cerro sin conectar.' : ''; },
       });
-
       handler.open();
     });
+
+    // ---------- Arranque ----------
+    if (token) irADashboard(); else show('screen-auth');
   </script>
 </body>
 </html>
