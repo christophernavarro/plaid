@@ -3,119 +3,116 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bluemax - Panel</title>
+  <title>Bluemax</title>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #111; }
+    body { font-family: system-ui, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 16px; color: #111; }
     h1 { margin-bottom: 4px; }
     h3 { margin-top: 28px; margin-bottom: 4px; }
-    button { padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #f7f7f7; }
+    button { padding: 10px 18px; font-size: 15px; cursor: pointer; border: 1px solid #ccc; border-radius: 8px; background: #f7f7f7; }
     button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; }
-    input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }
-    th { color: #555; font-weight: 600; }
-    .debito { color: #b91c1c; }
-    .credito { color: #15803d; }
-    .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
-    .badge.ok { background: #dcfce7; color: #15803d; }
-    .badge.pend { background: #fef9c3; color: #a16207; }
-    .card { border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; font-size: 14px; }
+    input { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 8px; }
     .muted { color: #666; font-size: 13px; }
     .hidden { display: none; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .spread { justify-content: space-between; }
-    /* Tarjetas de resumen */
-    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
-    .tile { border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
+    .box { max-width: 380px; }
+    .tabs { display: flex; gap: 16px; margin-bottom: 8px; }
+    .tabs button.active { font-weight: 700; text-decoration: none; color: #111; }
+    .error { color: #b91c1c; font-size: 13px; margin-top: 8px; }
+    /* Dashboard */
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+    .tile { border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; }
     .tile .label { font-size: 12px; color: #666; }
-    .tile .value { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .tile .value { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
     .tile .value.deb { color: #b91c1c; }
     .tile .value.cred { color: #15803d; }
-    /* Avatar del cliente */
-    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #2563eb; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
-    .head { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-    .filtros { margin-top: 12px; gap: 10px; }
-    .filtros label { font-size: 13px; color: #555; }
+    .chart { border: 1px solid #eee; border-radius: 10px; padding: 16px; margin-top: 12px; }
+    .leyenda { display: flex; gap: 16px; font-size: 13px; margin-top: 8px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+    ul.mov { list-style: none; padding: 0; margin-top: 8px; }
+    ul.mov li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .connect-box { border: 1px dashed #c7d2fe; background: #f5f8ff; border-radius: 12px; padding: 24px; text-align: center; margin-top: 20px; }
   </style>
 </head>
 <body>
 
-  <!-- ================= LOGIN ================= -->
-  <section id="screen-login">
-    <h1>Bluemax - Panel</h1>
-    <p class="muted">Ingresa para administrar tus clientes.</p>
-    <div class="row">
-      <input id="login-pass" type="password" placeholder="Clave de administrador">
-      <button class="primary" id="login-btn">Ingresar</button>
+  <!-- ================= AUTH (usuario) ================= -->
+  <section id="screen-auth">
+    <h1>Bluemax</h1>
+    <p class="muted">Conecta tu banco y ve tus finanzas en un solo lugar.</p>
+
+    <div class="box" style="margin-top:20px">
+      <div class="tabs">
+        <button class="link active" id="tab-login">Ingresar</button>
+        <button class="link" id="tab-registro">Crear cuenta</button>
+      </div>
+
+      <!-- Login -->
+      <div id="form-login">
+        <input id="login-email" type="email" placeholder="Email">
+        <input id="login-pass" type="password" placeholder="Clave">
+        <button class="primary" id="login-btn" style="margin-top:12px;width:100%">Ingresar</button>
+      </div>
+
+      <!-- Registro -->
+      <div id="form-registro" class="hidden">
+        <input id="reg-nombre" placeholder="Nombre y apellido">
+        <input id="reg-email" type="email" placeholder="Email">
+        <input id="reg-pass" type="password" placeholder="Elegi una clave">
+        <button class="primary" id="reg-btn" style="margin-top:12px;width:100%">Crear cuenta</button>
+      </div>
+
+      <div id="auth-error" class="error"></div>
     </div>
-    <div id="login-error" class="muted" style="color:#b91c1c"></div>
+
+    <p style="margin-top:24px"><a class="link" href="/admin.html">Acceso contador &rarr;</a></p>
   </section>
 
-  <!-- ================= LISTA DE CLIENTES ================= -->
-  <section id="screen-clientes" class="hidden">
+  <!-- ================= DASHBOARD (usuario) ================= -->
+  <section id="screen-dash" class="hidden">
     <div class="row spread">
-      <h1>Clientes</h1>
+      <h1 id="dash-hola"></h1>
       <button class="link" id="logout-btn">Salir</button>
     </div>
-    <div class="row" style="margin-top:8px">
-      <input id="nuevo-nombre" placeholder="Nombre del cliente">
-      <input id="nuevo-email" placeholder="Email (opcional)">
-      <button class="primary" id="add-btn">Agregar cliente</button>
-    </div>
-    <input id="buscador" placeholder="Buscar cliente..." style="width:100%;margin-top:12px">
-    <div id="clientes-lista"></div>
-  </section>
 
-  <!-- ================= DETALLE DE CLIENTE ================= -->
-  <section id="screen-detalle" class="hidden">
-    <button class="link" id="volver-btn">&larr; Volver a clientes</button>
-    <div class="head">
-      <span class="avatar" id="detalle-avatar"></span>
-      <div>
-        <h1 id="detalle-nombre" style="margin:0"></h1>
-        <div id="detalle-sub" class="muted"></div>
+    <!-- Sin banco conectado -->
+    <div id="sin-banco" class="connect-box hidden">
+      <p>Todavia no conectaste tu banco.</p>
+      <button class="primary" id="connect-btn">Conectar banco</button>
+      <p class="muted" id="connect-status" style="margin-top:10px"></p>
+    </div>
+
+    <!-- Con banco conectado -->
+    <div id="con-banco" class="hidden">
+      <div id="tiles" class="tiles"></div>
+
+      <div class="chart">
+        <strong>Ingresos vs Gastos por mes</strong>
+        <div id="grafico"></div>
+        <div class="leyenda">
+          <span><span class="dot" style="background:#15803d"></span>Ingresos</span>
+          <span><span class="dot" style="background:#b91c1c"></span>Gastos</span>
+        </div>
       </div>
+
+      <h3>Ultimos movimientos</h3>
+      <ul class="mov" id="ultimos"></ul>
+      <p class="muted" id="dash-nota"></p>
+      <button id="dash-refresh" style="margin-top:6px">Actualizar</button>
     </div>
-    <div id="detalle-estado" class="muted" style="margin-top:8px"></div>
-
-    <div class="row" style="margin-top:12px">
-      <button id="link-btn">Generar link para el cliente</button>
-      <button id="refresh-btn">Actualizar datos</button>
-    </div>
-    <div id="link-box" class="muted" style="margin-top:8px"></div>
-
-    <!-- Resumen -->
-    <div id="tiles" class="tiles hidden"></div>
-
-    <h3>Cuentas</h3>
-    <div id="cuentas-box" class="muted">Sin datos todavia.</div>
-
-    <h3>Movimientos</h3>
-    <div class="row filtros">
-      <label>Desde <input type="date" id="f-desde"></label>
-      <label>Hasta <input type="date" id="f-hasta"></label>
-      <button id="aplicar-btn">Aplicar</button>
-      <button id="limpiar-btn">Limpiar</button>
-      <button class="primary" id="exportar-btn">Exportar CSV</button>
-    </div>
-    <div id="tx-box" class="muted">Sin datos todavia.</div>
   </section>
 
   <script>
-    let token = localStorage.getItem('adminToken') || null;
-    let clienteActual = null;
-    let nombreActual = '';
+    let token = localStorage.getItem('userToken') || null;
     let pollTimer = null;
-    let datosCliente = { accounts: [], transactions: [] }; // ultimo dato cargado
-    let clientesCache = [];
 
     const $ = (id) => document.getElementById(id);
-    const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
     function show(screen) {
-      ['screen-login', 'screen-clientes', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
+      ['screen-auth', 'screen-dash'].forEach((s) => $(s).classList.add('hidden'));
       $(screen).classList.remove('hidden');
     }
 
@@ -126,228 +123,151 @@
       return res.json();
     }
 
-    // ---------- Login ----------
+    // ---------- Tabs auth ----------
+    $('tab-login').addEventListener('click', () => {
+      $('tab-login').classList.add('active'); $('tab-registro').classList.remove('active');
+      $('form-login').classList.remove('hidden'); $('form-registro').classList.add('hidden');
+      $('auth-error').textContent = '';
+    });
+    $('tab-registro').addEventListener('click', () => {
+      $('tab-registro').classList.add('active'); $('tab-login').classList.remove('active');
+      $('form-registro').classList.remove('hidden'); $('form-login').classList.add('hidden');
+      $('auth-error').textContent = '';
+    });
+
+    // ---------- Login / Registro ----------
     $('login-btn').addEventListener('click', async () => {
-      const password = $('login-pass').value;
-      const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) });
-      if (data.token) {
-        token = data.token;
-        localStorage.setItem('adminToken', token);
-        $('login-pass').value = '';
-        $('login-error').textContent = '';
-        irAClientes();
-      } else {
-        $('login-error').textContent = data.error || 'Error al ingresar';
-      }
+      const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ email: $('login-email').value, password: $('login-pass').value }) });
+      manejarAuth(data);
+    });
+    $('reg-btn').addEventListener('click', async () => {
+      const data = await api('/api/registro', { method: 'POST', body: JSON.stringify({ nombre: $('reg-nombre').value, email: $('reg-email').value, password: $('reg-pass').value }) });
+      manejarAuth(data);
     });
     $('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); });
 
-    $('logout-btn').addEventListener('click', () => {
-      token = null;
-      localStorage.removeItem('adminToken');
-      show('screen-login');
-    });
-
-    // ---------- Lista de clientes ----------
-    async function irAClientes() {
-      if (pollTimer) clearInterval(pollTimer);
-      show('screen-clientes');
-      const data = await api('/api/clientes');
-      if (data.error) { // sesion vencida
-        token = null; localStorage.removeItem('adminToken'); show('screen-login'); return;
-      }
-      clientesCache = data.clientes;
-      renderClientes();
-    }
-
-    function renderClientes() {
-      const filtro = $('buscador').value.trim().toLowerCase();
-      const lista = clientesCache.filter((c) =>
-        c.nombre.toLowerCase().includes(filtro) || (c.email || '').toLowerCase().includes(filtro));
-      const cont = $('clientes-lista');
-      cont.innerHTML = '';
-      if (!clientesCache.length) {
-        cont.innerHTML = '<p class="muted">Todavia no hay clientes. Agrega el primero arriba.</p>';
-        return;
-      }
-      if (!lista.length) {
-        cont.innerHTML = '<p class="muted">Ningun cliente coincide con la busqueda.</p>';
-        return;
-      }
-      lista.forEach((c) => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        const badge = c.conectado
-          ? '<span class="badge ok">Conectado</span>'
-          : '<span class="badge pend">Pendiente</span>';
-        div.innerHTML = `
-          <div>
-            <strong>${c.nombre}</strong> ${badge}<br>
-            <span class="muted">${c.email || 'sin email'} &middot; ${c.cantidadCuentas} cuentas &middot; ${c.cantidadTransacciones} movimientos</span>
-          </div>
-          <button>Ver</button>
-        `;
-        div.querySelector('button').addEventListener('click', () => verCliente(c.id, c.nombre, c.email));
-        cont.appendChild(div);
-      });
-    }
-
-    $('buscador').addEventListener('input', renderClientes);
-
-    $('add-btn').addEventListener('click', async () => {
-      const nombre = $('nuevo-nombre').value.trim();
-      const email = $('nuevo-email').value.trim();
-      if (!nombre) return;
-      await api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre, email }) });
-      $('nuevo-nombre').value = '';
-      $('nuevo-email').value = '';
-      irAClientes();
-    });
-
-    // ---------- Detalle de cliente ----------
-    async function verCliente(id, nombre, email) {
-      clienteActual = id;
-      nombreActual = nombre;
-      show('screen-detalle');
-      $('detalle-nombre').textContent = nombre;
-      $('detalle-sub').textContent = email || 'sin email';
-      $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
-      $('detalle-estado').textContent = '';
-      $('link-box').textContent = '';
-      $('tiles').classList.add('hidden');
-      $('f-desde').value = '';
-      $('f-hasta').value = '';
-      $('cuentas-box').textContent = 'Cargando...';
-      $('tx-box').textContent = 'Cargando...';
-      await cargarDatos();
-      // Auto-refresco: mientras Plaid completa los 24 meses en segundo plano.
-      if (pollTimer) clearInterval(pollTimer);
-      let n = 0;
-      pollTimer = setInterval(async () => {
-        n++;
-        await cargarDatos();
-        if (n >= 12) clearInterval(pollTimer); // ~1 min
-      }, 5000);
-    }
-
-    $('volver-btn').addEventListener('click', irAClientes);
-
-    $('link-btn').addEventListener('click', async () => {
-      const data = await api('/api/clientes/' + clienteActual + '/link', { method: 'POST' });
-      if (data.url) {
-        $('link-box').innerHTML = 'Envia este link al cliente para que conecte su banco:<br>'
-          + '<input style="width:100%;margin-top:6px" readonly value="' + data.url + '" onclick="this.select()">';
-      }
-    });
-
-    $('refresh-btn').addEventListener('click', cargarDatos);
-    $('aplicar-btn').addEventListener('click', renderMovimientos);
-    $('limpiar-btn').addEventListener('click', () => { $('f-desde').value = ''; $('f-hasta').value = ''; renderMovimientos(); });
-    $('exportar-btn').addEventListener('click', exportarCSV);
-
-    async function cargarDatos() {
-      const data = await api('/api/clientes/' + clienteActual + '/datos');
-      if (data.error) {
-        $('cuentas-box').textContent = data.error;
-        $('tx-box').textContent = '';
-        return;
-      }
-      datosCliente = data;
-      $('detalle-estado').textContent = data.conectado
-        ? 'Banco conectado.'
-        : 'El cliente todavia no conecto su banco. Genera el link y enviaselo.';
-
-      // Cuentas
-      if (!data.accounts.length) {
-        $('cuentas-box').textContent = 'Sin cuentas todavia.';
+    function manejarAuth(data) {
+      if (data.token) {
+        token = data.token;
+        localStorage.setItem('userToken', token);
+        $('auth-error').textContent = '';
+        irADashboard();
       } else {
-        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
-        data.accounts.forEach((a) => {
-          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
-        });
-        html += '</tbody></table>';
-        $('cuentas-box').innerHTML = html;
+        $('auth-error').textContent = data.error || 'Error';
       }
-
-      renderMovimientos();
     }
 
-    // Devuelve las transacciones filtradas por el rango de fechas elegido.
-    function transaccionesFiltradas() {
-      const desde = $('f-desde').value;
-      const hasta = $('f-hasta').value;
-      return datosCliente.transactions.filter((t) => {
-        if (desde && t.fecha < desde) return false;
-        if (hasta && t.fecha > hasta) return false;
-        return true;
-      });
+    $('logout-btn').addEventListener('click', () => {
+      token = null; localStorage.removeItem('userToken');
+      if (pollTimer) clearInterval(pollTimer);
+      show('screen-auth');
+    });
+
+    // ---------- Dashboard ----------
+    async function irADashboard() {
+      show('screen-dash');
+      await cargar();
     }
 
-    function nombreCuenta(accountId) {
-      const a = datosCliente.accounts.find((x) => x.id === accountId);
-      return a ? a.nombre : '';
-    }
+    $('dash-refresh').addEventListener('click', cargar);
 
-    function renderMovimientos() {
-      const txs = transaccionesFiltradas();
+    async function cargar() {
+      const data = await api('/api/mi/datos');
+      if (data.error) { token = null; localStorage.removeItem('userToken'); show('screen-auth'); return; }
+      $('dash-hola').textContent = 'Hola, ' + data.nombre;
 
-      // Tarjetas de resumen (sobre lo filtrado)
-      const totalDeb = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
-      const totalCred = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
-      const saldoTotal = datosCliente.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
-      if (datosCliente.transactions.length || datosCliente.accounts.length) {
-        $('tiles').classList.remove('hidden');
-        $('tiles').innerHTML = `
-          <div class="tile"><div class="label">Cuentas</div><div class="value">${datosCliente.accounts.length}</div></div>
-          <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
-          <div class="tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
-          <div class="tile"><div class="label">Debitos (gastos)</div><div class="value deb">${fmt(totalDeb)}</div></div>
-          <div class="tile"><div class="label">Creditos (ingresos)</div><div class="value cred">${fmt(totalCred)}</div></div>
-        `;
-      }
-
-      // Tabla de movimientos
-      if (!datosCliente.transactions.length) {
-        $('tx-box').textContent = 'Sin movimientos todavia.';
+      if (!data.conectado) {
+        $('sin-banco').classList.remove('hidden');
+        $('con-banco').classList.add('hidden');
         return;
       }
-      if (!txs.length) {
-        $('tx-box').textContent = 'No hay movimientos en el rango de fechas elegido.';
-        return;
-      }
-      let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
+      $('sin-banco').classList.add('hidden');
+      $('con-banco').classList.remove('hidden');
+      render(data);
+    }
+
+    function render(data) {
+      const txs = data.transactions;
+      const ingresos = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
+      const gastos = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
+      const saldo = data.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
+
+      $('tiles').innerHTML = `
+        <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldo)}</div></div>
+        <div class="tile"><div class="label">Ingresos (historico)</div><div class="value cred">${fmt(ingresos)}</div></div>
+        <div class="tile"><div class="label">Gastos (historico)</div><div class="value deb">${fmt(gastos)}</div></div>
+        <div class="tile"><div class="label">Cuentas</div><div class="value">${data.accounts.length}</div></div>
+      `;
+
+      $('grafico').innerHTML = graficoMensual(txs);
+
+      // Ultimos 8 movimientos (vista simple)
+      const ult = txs.slice(0, 8).map((t) => {
+        const signo = t.tipo === 'credito' ? '+' : '-';
+        const color = t.tipo === 'credito' ? '#15803d' : '#b91c1c';
+        return `<li><span>${t.fecha} &middot; ${t.descripcion}</span><span style="color:${color};font-variant-numeric:tabular-nums">${signo}${fmt(t.monto)}</span></li>`;
+      }).join('');
+      $('ultimos').innerHTML = ult;
+      $('dash-nota').textContent = txs.length + ' movimientos en total en tu cuenta.';
+    }
+
+    // Grafico de barras (SVG puro) de ingresos vs gastos por mes, ultimos 6 meses.
+    function graficoMensual(txs) {
+      const meses = {}; // 'YYYY-MM' -> {ing, gas}
       txs.forEach((t) => {
-        html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
+        const m = t.fecha.slice(0, 7);
+        if (!meses[m]) meses[m] = { ing: 0, gas: 0 };
+        if (t.tipo === 'credito') meses[m].ing += t.monto; else meses[m].gas += t.monto;
       });
-      html += '</tbody></table>';
-      $('tx-box').innerHTML = html;
+      const claves = Object.keys(meses).sort().slice(-6);
+      if (!claves.length) return '<p class="muted">Sin datos para graficar.</p>';
+
+      const max = Math.max(...claves.flatMap((k) => [meses[k].ing, meses[k].gas]), 1);
+      const W = 640, H = 220, padB = 30, padT = 10;
+      const anchoGrupo = W / claves.length;
+      const wBarra = Math.min(26, anchoGrupo / 3);
+
+      let barras = '';
+      claves.forEach((k, i) => {
+        const cx = i * anchoGrupo + anchoGrupo / 2;
+        const hIng = (meses[k].ing / max) * (H - padB - padT);
+        const hGas = (meses[k].gas / max) * (H - padB - padT);
+        barras += `
+          <rect x="${cx - wBarra - 2}" y="${H - padB - hIng}" width="${wBarra}" height="${hIng}" fill="#15803d" rx="3"></rect>
+          <rect x="${cx + 2}" y="${H - padB - hGas}" width="${wBarra}" height="${hGas}" fill="#b91c1c" rx="3"></rect>
+          <text x="${cx}" y="${H - padB + 16}" font-size="11" fill="#666" text-anchor="middle">${k.slice(5)}/${k.slice(2, 4)}</text>
+        `;
+      });
+      return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:8px">
+        <line x1="0" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="#e5e5e5"></line>
+        ${barras}
+      </svg>`;
     }
 
-    // ---------- Exportar CSV ----------
-    function exportarCSV() {
-      const txs = transaccionesFiltradas();
-      if (!txs.length) { alert('No hay movimientos para exportar en ese rango.'); return; }
+    // ---------- Conectar banco ----------
+    $('connect-btn').addEventListener('click', async () => {
+      $('connect-status').textContent = 'Abriendo conexion segura...';
+      const data = await api('/api/mi/create_link_token', { method: 'POST' });
+      if (!data.link_token) { $('connect-status').textContent = 'No se pudo iniciar. Intenta de nuevo.'; return; }
 
-      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-      const filas = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Monto']];
-      txs.forEach((t) => filas.push([t.fecha, t.descripcion, nombreCuenta(t.cuenta), t.tipo, t.monto.toFixed(2)]));
-      const csv = '﻿' + filas.map((f) => f.map(esc).join(',')).join('\r\n');
-
-      const desde = $('f-desde').value || 'inicio';
-      const hasta = $('f-hasta').value || 'hoy';
-      const nombre = nombreActual.replace(/[^a-z0-9]+/gi, '_');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `movimientos_${nombre}_${desde}_${hasta}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
-    }
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: async (public_token) => {
+          $('connect-status').textContent = 'Conectando, un momento...';
+          await api('/api/mi/exchange', { method: 'POST', body: JSON.stringify({ public_token }) });
+          await cargar();
+          // Auto-refresco mientras Plaid completa el historial en segundo plano.
+          if (pollTimer) clearInterval(pollTimer);
+          let n = 0;
+          pollTimer = setInterval(async () => { n++; await cargar(); if (n >= 12) clearInterval(pollTimer); }, 5000);
+        },
+        onExit: (err) => { $('connect-status').textContent = err ? 'Se cerro sin conectar.' : ''; },
+      });
+      handler.open();
+    });
 
     // ---------- Arranque ----------
-    if (token) irAClientes(); else show('screen-login');
+    if (token) irADashboard(); else show('screen-auth');
   </script>
 </body>
 </html>
