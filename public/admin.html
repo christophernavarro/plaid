@@ -3,93 +3,140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bluemax - Contador</title>
+  <title>Bluemaxp - Contador</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Archivo:wght@400;500;600;700&display=swap">
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #111; }
-    h1 { margin-bottom: 4px; }
-    h3 { margin-top: 28px; margin-bottom: 4px; }
-    button { padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #f7f7f7; }
-    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-    button.link { background: none; border: none; color: #2563eb; padding: 0; text-decoration: underline; }
-    input { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; }
-    th { color: #555; font-weight: 600; }
-    .debito { color: #b91c1c; }
-    .credito { color: #15803d; }
-    .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
-    .badge.ok { background: #dcfce7; color: #15803d; }
-    .badge.pend { background: #fef9c3; color: #a16207; }
-    .card { border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .muted { color: #666; font-size: 13px; }
-    .hidden { display: none; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .spread { justify-content: space-between; }
-    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
-    .tile { border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
-    .tile .label { font-size: 12px; color: #666; }
-    .tile .value { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .tile .value.deb { color: #b91c1c; }
-    .tile .value.cred { color: #15803d; }
-    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #2563eb; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
-    .head { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-    .filtros { margin-top: 12px; gap: 10px; }
-    .filtros label { font-size: 13px; color: #555; }
+    :root {
+      --bg:#f4f1ea; --ink:#1c1b18; --muted:#7c766a; --line:#e7e0d0; --panel:#fbf9f3;
+      --accent:#1f3a52; --accent2:#2b5578; --pos:#2f6d4f; --neg:#b0553f; --pend:#9a7b2e;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Archivo',system-ui,sans-serif; color:var(--ink); background:var(--bg); }
+    .serif { font-family:'Newsreader',Georgia,serif; }
+    .hidden { display:none !important; }
+    a { color:var(--accent); } a:hover { color:#142838; }
+    .wrap { max-width:940px; margin:0 auto; padding:34px 22px 60px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .spread { justify-content:space-between; }
+    .muted { color:var(--muted); font-size:13px; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+
+    .logo-mark { display:block; flex:none; }
+    .brandlock { display:flex; align-items:flex-end; gap:8px; }
+    .brandlock .name { font-family:'Newsreader',serif; font-size:23px; font-weight:600; letter-spacing:-0.02em; line-height:1; }
+    .tag { font-size:12px; color:var(--accent); background:#e9eef3; border-radius:999px; padding:3px 11px; font-weight:600; align-self:center; }
+
+    .btn-primary { background:linear-gradient(180deg,#2b5578,#1f3a52); color:#f4f1ea; border:none; border-radius:11px; padding:11px 20px; font:600 14px 'Archivo',sans-serif; cursor:pointer;
+      box-shadow:0 6px 16px rgba(31,58,82,.28), inset 0 1px 0 rgba(255,255,255,.16); transition:transform .15s, box-shadow .15s, filter .15s; display:inline-flex; align-items:center; gap:8px; }
+    .btn-primary:hover { transform:translateY(-1px); filter:brightness(1.07); box-shadow:0 10px 22px rgba(31,58,82,.34); }
+    .btn-ghost { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 16px; font:500 13px 'Archivo',sans-serif; cursor:pointer; color:var(--ink); transition:border-color .15s, box-shadow .15s, transform .15s; }
+    .btn-ghost:hover { border-color:#cfc6b2; box-shadow:0 4px 12px rgba(28,27,24,.06); transform:translateY(-1px); }
+    .btn-link { background:none; border:none; color:var(--accent); padding:0; cursor:pointer; font:14px 'Archivo',sans-serif; text-decoration:underline; }
+
+    .field { padding:11px 13px; font-size:14px; border:1px solid var(--line); border-radius:10px; background:#fff; font-family:'Archivo',sans-serif; box-shadow:inset 0 1px 2px rgba(28,27,24,.04); transition:border-color .15s, box-shadow .15s; }
+    .field:focus { outline:none; border-color:#9db4c8; box-shadow:0 0 0 3px rgba(31,58,82,.12); }
+    .search { width:100%; padding:13px 14px 13px 42px; }
+
+    .card { background:linear-gradient(180deg,#fbf9f3,#f5f1e8); border:1px solid #ece5d5; border-radius:14px; box-shadow:0 1px 2px rgba(28,27,24,.04), 0 12px 30px rgba(28,27,24,.05); }
+    .user-card { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 18px; margin-top:12px; }
+    .av { width:38px; height:38px; border-radius:50%; background:linear-gradient(145deg,#eaf0f5,#dbe5ef); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; font-weight:600; font-size:15px; box-shadow:inset 0 1px 0 rgba(255,255,255,.7); flex:none; }
+    .av.dark { background:linear-gradient(145deg,#2b5578,#183048); color:#f4f1ea; }
+    .badge { font-size:12px; padding:3px 11px; border-radius:999px; font-weight:600; }
+    .badge.ok { background:#e3ede7; color:var(--pos); box-shadow:inset 0 0 0 1px rgba(47,109,79,.16); }
+    .badge.pend { background:#f3ead2; color:var(--pend); box-shadow:inset 0 0 0 1px rgba(154,123,46,.18); }
+
+    .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:14px; margin-top:22px; }
+    .tile { padding:14px 16px; }
+    .tile .label { font-size:12px; color:var(--muted); }
+    .tile .value { font-family:'Newsreader',serif; font-size:26px; font-weight:600; margin-top:4px; }
+    .tile .value.deb { color:var(--neg); } .tile .value.cred { color:var(--pos); }
+
+    .panel { background:linear-gradient(180deg,#fbf9f3,#f6f2e9); border:1px solid #ece5d5; border-radius:14px; padding:6px 16px; margin-top:12px; box-shadow:0 1px 2px rgba(28,27,24,.04), 0 12px 30px rgba(28,27,24,.05); }
+    .panel.msg { padding:16px; color:var(--muted); font-size:13px; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; padding:12px 8px; font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+    td { padding:12px 8px; border-top:1px solid var(--line); font-size:14px; }
+    .debito { color:var(--neg); } .credito { color:var(--pos); }
+    .sectitle { font-family:'Newsreader',serif; font-size:20px; font-weight:600; margin:32px 0 0; }
+    .head { display:flex; align-items:center; gap:14px; margin-top:14px; }
+    .filtros { margin-top:12px; gap:10px; }
+    .filtros label { font-size:13px; color:var(--muted); }
+    .login-card { max-width:400px; margin:80px auto 0; padding:36px 34px; }
   </style>
 </head>
 <body>
+  <div class="wrap">
 
-  <!-- ================= LOGIN CONTADOR ================= -->
-  <section id="screen-login">
-    <h1>Bluemax - Contador</h1>
-    <p class="muted">Panel para ver a todos tus usuarios y sus datos.</p>
-    <div class="row">
-      <input id="login-pass" type="password" placeholder="Clave de contador">
-      <button class="primary" id="login-btn">Ingresar</button>
-    </div>
-    <div id="login-error" class="muted" style="color:#b91c1c"></div>
-    <p style="margin-top:20px"><a class="link" href="/">&larr; Volver al inicio</a></p>
-  </section>
-
-  <!-- ================= LISTA DE USUARIOS ================= -->
-  <section id="screen-usuarios" class="hidden">
-    <div class="row spread">
-      <h1>Usuarios</h1>
-      <button class="link" id="logout-btn">Salir</button>
-    </div>
-    <input id="buscador" placeholder="Buscar usuario por nombre o email..." style="width:100%;margin-top:12px">
-    <div id="usuarios-lista"></div>
-  </section>
-
-  <!-- ================= DETALLE DE USUARIO ================= -->
-  <section id="screen-detalle" class="hidden">
-    <button class="link" id="volver-btn">&larr; Volver a usuarios</button>
-    <div class="head">
-      <span class="avatar" id="detalle-avatar"></span>
-      <div>
-        <h1 id="detalle-nombre" style="margin:0"></h1>
-        <div id="detalle-sub" class="muted"></div>
+    <!-- ================= LOGIN ================= -->
+    <section id="screen-login">
+      <div class="card login-card">
+        <div class="brandlock" style="justify-content:center;">
+          <svg class="logo-mark" width="27" height="24" viewBox="0 0 24 24" fill="#1f3a52"><rect x="2" y="13" width="4.6" height="8" rx="2.3"/><rect x="9.7" y="8" width="4.6" height="13" rx="2.3"/><rect x="17.4" y="3" width="4.6" height="18" rx="2.3"/></svg>
+          <span class="name">Bluema<span style="color:var(--accent);">x</span>p</span>
+          <span class="tag">Contador</span>
+        </div>
+        <p class="muted" style="text-align:center; margin-top:14px;">Panel para ver a todos tus usuarios y sus datos.</p>
+        <input class="field" id="login-pass" type="password" placeholder="Clave de contador" style="width:100%; margin-top:16px;">
+        <button class="btn-primary" id="login-btn" style="width:100%; justify-content:center; margin-top:12px;">Ingresar</button>
+        <div id="login-error" style="color:var(--neg); font-size:13px; margin-top:10px; text-align:center; min-height:16px;"></div>
+        <p style="text-align:center; margin-top:16px;"><a href="/">&larr; Volver al inicio</a></p>
       </div>
-    </div>
-    <div id="detalle-estado" class="muted" style="margin-top:8px"></div>
-    <button id="refresh-btn" style="margin-top:12px">Actualizar datos</button>
+    </section>
 
-    <div id="tiles" class="tiles hidden"></div>
+    <!-- ================= LISTA DE USUARIOS ================= -->
+    <section id="screen-usuarios" class="hidden">
+      <div class="row spread">
+        <div class="brandlock">
+          <svg class="logo-mark" width="27" height="24" viewBox="0 0 24 24" fill="#1f3a52"><rect x="2" y="13" width="4.6" height="8" rx="2.3"/><rect x="9.7" y="8" width="4.6" height="13" rx="2.3"/><rect x="17.4" y="3" width="4.6" height="18" rx="2.3"/></svg>
+          <span class="name">Bluema<span style="color:var(--accent);">x</span>p</span>
+          <span class="tag">Contador</span>
+        </div>
+        <button class="btn-link" id="logout-btn">Salir</button>
+      </div>
 
-    <h3>Cuentas</h3>
-    <div id="cuentas-box" class="muted">Sin datos todavia.</div>
+      <div style="margin-top:30px;">
+        <div style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted);">Cartera de clientes</div>
+        <h1 class="serif" style="font-size:38px; font-weight:500; margin:8px 0 0; letter-spacing:-0.02em;">Usuarios</h1>
+      </div>
 
-    <h3>Movimientos</h3>
-    <div class="row filtros">
-      <label>Desde <input type="date" id="f-desde"></label>
-      <label>Hasta <input type="date" id="f-hasta"></label>
-      <button id="aplicar-btn">Aplicar</button>
-      <button id="limpiar-btn">Limpiar</button>
-      <button class="primary" id="exportar-btn">Exportar CSV</button>
-    </div>
-    <div id="tx-box" class="muted">Sin datos todavia.</div>
-  </section>
+      <div style="position:relative; margin-top:20px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="position:absolute; left:14px; top:14px;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input class="field search" id="buscador" placeholder="Buscar usuario por nombre o email...">
+      </div>
+      <div id="usuarios-lista"></div>
+    </section>
+
+    <!-- ================= DETALLE ================= -->
+    <section id="screen-detalle" class="hidden">
+      <button class="btn-link" id="volver-btn">&larr; Volver a usuarios</button>
+      <div class="head">
+        <span class="av dark" id="detalle-avatar" style="width:52px; height:52px; font-size:22px;"></span>
+        <div>
+          <h1 class="serif" id="detalle-nombre" style="font-size:30px; font-weight:500; margin:0; letter-spacing:-0.01em;"></h1>
+          <div class="muted" id="detalle-sub"></div>
+        </div>
+      </div>
+      <div class="muted" id="detalle-estado" style="margin-top:8px;"></div>
+      <button class="btn-ghost" id="refresh-btn" style="margin-top:14px;">Actualizar datos</button>
+
+      <div id="tiles" class="tiles hidden"></div>
+
+      <h3 class="sectitle">Cuentas</h3>
+      <div id="cuentas-box" class="panel msg">Sin datos todavia.</div>
+
+      <h3 class="sectitle">Movimientos</h3>
+      <div class="row filtros">
+        <label>Desde <input class="field" type="date" id="f-desde"></label>
+        <label>Hasta <input class="field" type="date" id="f-hasta"></label>
+        <button class="btn-ghost" id="aplicar-btn">Aplicar</button>
+        <button class="btn-ghost" id="limpiar-btn">Limpiar</button>
+        <button class="btn-primary" id="exportar-btn" style="margin-left:auto;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Exportar CSV</button>
+      </div>
+      <div id="tx-box" class="panel msg">Sin datos todavia.</div>
+    </section>
+
+  </div>
 
   <script>
     let token = localStorage.getItem('adminToken') || null;
@@ -147,19 +194,23 @@
       const cont = $('usuarios-lista');
       cont.innerHTML = '';
       if (!data.usuarios.length) {
-        cont.innerHTML = '<p class="muted">No hay usuarios que coincidan.</p>';
+        cont.innerHTML = '<p class="muted" style="margin-top:16px;">No hay usuarios que coincidan.</p>';
         return;
       }
       data.usuarios.forEach((u) => {
         const div = document.createElement('div');
-        div.className = 'card';
+        div.className = 'card user-card';
         const badge = u.conectado ? '<span class="badge ok">Conectado</span>' : '<span class="badge pend">Sin banco</span>';
+        const inicial = (u.nombre[0] || '?').toUpperCase();
         div.innerHTML = `
-          <div>
-            <strong>${u.nombre}</strong> ${badge}<br>
-            <span class="muted">${u.email} &middot; ${u.cantidadCuentas} cuentas &middot; ${u.cantidadTransacciones} movimientos</span>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="av">${inicial}</span>
+            <div>
+              <div style="font-weight:600;">${u.nombre} ${badge}</div>
+              <div class="muted">${u.email} &middot; ${u.cantidadCuentas} cuentas &middot; ${u.cantidadTransacciones} movimientos</div>
+            </div>
           </div>
-          <button>Ver</button>
+          <button class="btn-ghost">Ver &rarr;</button>
         `;
         div.querySelector('button').addEventListener('click', () => verUsuario(u.id, u.nombre, u.email));
         cont.appendChild(div);
@@ -176,8 +227,8 @@
       $('detalle-estado').textContent = '';
       $('tiles').classList.add('hidden');
       $('f-desde').value = ''; $('f-hasta').value = '';
-      $('cuentas-box').textContent = 'Cargando...';
-      $('tx-box').textContent = 'Cargando...';
+      $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Cargando...';
+      $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Cargando...';
       await cargarDatos();
       if (pollTimer) clearInterval(pollTimer);
       let n = 0;
@@ -192,19 +243,19 @@
 
     async function cargarDatos() {
       const data = await api('/api/admin/usuarios/' + usuarioActual + '/datos');
-      if (data.error) { $('cuentas-box').textContent = data.error; $('tx-box').textContent = ''; return; }
+      if (data.error) { $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = data.error; $('tx-box').textContent = ''; return; }
       datos = data;
       $('detalle-estado').textContent = data.conectado ? 'Banco conectado.' : 'El usuario todavia no conecto su banco.';
 
       if (!data.accounts.length) {
-        $('cuentas-box').textContent = 'Sin cuentas todavia.';
+        $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Sin cuentas todavia.';
       } else {
         let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
         data.accounts.forEach((a) => {
           html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
         });
         html += '</tbody></table>';
-        $('cuentas-box').innerHTML = html;
+        $('cuentas-box').className = 'panel'; $('cuentas-box').innerHTML = html;
       }
       renderMovimientos();
     }
@@ -228,22 +279,22 @@
       if (datos.transactions.length || datos.accounts.length) {
         $('tiles').classList.remove('hidden');
         $('tiles').innerHTML = `
-          <div class="tile"><div class="label">Cuentas</div><div class="value">${datos.accounts.length}</div></div>
-          <div class="tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
-          <div class="tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
-          <div class="tile"><div class="label">Debitos (gastos)</div><div class="value deb">${fmt(totalDeb)}</div></div>
-          <div class="tile"><div class="label">Creditos (ingresos)</div><div class="value cred">${fmt(totalCred)}</div></div>
+          <div class="card tile"><div class="label">Cuentas</div><div class="value">${datos.accounts.length}</div></div>
+          <div class="card tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
+          <div class="card tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
+          <div class="card tile"><div class="label">Debitos</div><div class="value deb">${fmt(totalDeb)}</div></div>
+          <div class="card tile"><div class="label">Creditos</div><div class="value cred">${fmt(totalCred)}</div></div>
         `;
       }
 
-      if (!datos.transactions.length) { $('tx-box').textContent = 'Sin movimientos todavia.'; return; }
-      if (!txs.length) { $('tx-box').textContent = 'No hay movimientos en el rango elegido.'; return; }
+      if (!datos.transactions.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Sin movimientos todavia.'; return; }
+      if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos en el rango elegido.'; return; }
       let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
       txs.forEach((t) => {
         html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
       });
       html += '</tbody></table>';
-      $('tx-box').innerHTML = html;
+      $('tx-box').className = 'panel'; $('tx-box').innerHTML = html;
     }
 
     function exportarCSV() {
