@@ -23,6 +23,7 @@ const plaidClient = new PlaidApi(configuration);
 // Estado en memoria (solo para el demo). En produccion: base de datos.
 // ==========================================================================
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'contador@bluemaxp.com').trim().toLowerCase();
 
 const usuarios = {};          // userId -> datos del usuario final
 const emailIndex = {};        // email (lower) -> userId
@@ -83,12 +84,23 @@ app.post('/api/registro', (req, res) => {
 
   const token = nuevoId();
   sesionesUsuario[token] = id;
-  res.json({ token, nombre: usuarios[id].nombre });
+  res.json({ token, role: 'user', nombre: usuarios[id].nombre });
 });
 
+// Login unico: reconoce si el email/clave son de un contador (admin) o de un
+// usuario final, y devuelve el rol para que el front redirija a la vista correcta.
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const key = (email || '').trim().toLowerCase();
+
+  // Contador (admin)
+  if (key === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    const token = nuevoId();
+    sesionesAdmin.add(token);
+    return res.json({ token, role: 'admin' });
+  }
+
+  // Usuario final
   const id = emailIndex[key];
   const u = id && usuarios[id];
   if (!u || u.passwordHash !== hashPass(password)) {
@@ -96,7 +108,7 @@ app.post('/api/login', (req, res) => {
   }
   const token = nuevoId();
   sesionesUsuario[token] = id;
-  res.json({ token, nombre: u.nombre });
+  res.json({ token, role: 'user', nombre: u.nombre });
 });
 
 // ==========================================================================

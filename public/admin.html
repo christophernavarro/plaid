@@ -29,7 +29,7 @@
     .btn-primary { background:linear-gradient(180deg,#2b5578,#1f3a52); color:#f4f1ea; border:none; border-radius:11px; padding:11px 20px; font:600 14px 'Archivo',sans-serif; cursor:pointer;
       box-shadow:0 6px 16px rgba(31,58,82,.28), inset 0 1px 0 rgba(255,255,255,.16); transition:transform .15s, box-shadow .15s, filter .15s; display:inline-flex; align-items:center; gap:8px; }
     .btn-primary:hover { transform:translateY(-1px); filter:brightness(1.07); box-shadow:0 10px 22px rgba(31,58,82,.34); }
-    .btn-ghost { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 16px; font:500 13px 'Archivo',sans-serif; cursor:pointer; color:var(--ink); transition:border-color .15s, box-shadow .15s, transform .15s; }
+    .btn-ghost { background:#fff; border:1px solid var(--line); border-radius:10px; padding:9px 15px; font:500 13px 'Archivo',sans-serif; cursor:pointer; color:var(--ink); transition:border-color .15s, box-shadow .15s, transform .15s; display:inline-flex; align-items:center; gap:7px; }
     .btn-ghost:hover { border-color:#cfc6b2; box-shadow:0 4px 12px rgba(28,27,24,.06); transform:translateY(-1px); }
     .btn-link { background:none; border:none; color:var(--accent); padding:0; cursor:pointer; font:14px 'Archivo',sans-serif; text-decoration:underline; }
 
@@ -61,27 +61,10 @@
     .head { display:flex; align-items:center; gap:14px; margin-top:14px; }
     .filtros { margin-top:12px; gap:10px; }
     .filtros label { font-size:13px; color:var(--muted); }
-    .login-card { max-width:400px; margin:80px auto 0; padding:36px 34px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-
-    <!-- ================= LOGIN ================= -->
-    <section id="screen-login">
-      <div class="card login-card">
-        <div class="brandlock" style="justify-content:center;">
-          <svg class="logo-mark" width="27" height="24" viewBox="0 0 24 24" fill="#1f3a52"><rect x="2" y="13" width="4.6" height="8" rx="2.3"/><rect x="9.7" y="8" width="4.6" height="13" rx="2.3"/><rect x="17.4" y="3" width="4.6" height="18" rx="2.3"/></svg>
-          <span class="name">Bluema<span style="color:var(--accent);">x</span>p</span>
-          <span class="tag">Contador</span>
-        </div>
-        <p class="muted" style="text-align:center; margin-top:14px;">Panel para ver a todos tus usuarios y sus datos.</p>
-        <input class="field" id="login-pass" type="password" placeholder="Clave de contador" style="width:100%; margin-top:16px;">
-        <button class="btn-primary" id="login-btn" style="width:100%; justify-content:center; margin-top:12px;">Ingresar</button>
-        <div id="login-error" style="color:var(--neg); font-size:13px; margin-top:10px; text-align:center; min-height:16px;"></div>
-        <p style="text-align:center; margin-top:16px;"><a href="/">&larr; Volver al inicio</a></p>
-      </div>
-    </section>
 
     <!-- ================= LISTA DE USUARIOS ================= -->
     <section id="screen-usuarios" class="hidden">
@@ -91,7 +74,7 @@
           <span class="name">Bluema<span style="color:var(--accent);">x</span>p</span>
           <span class="tag">Contador</span>
         </div>
-        <button class="btn-link" id="logout-btn">Salir</button>
+        <button class="btn-ghost" id="logout-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Salir</button>
       </div>
 
       <div style="margin-top:30px;">
@@ -149,8 +132,14 @@
     const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
     function show(screen) {
-      ['screen-login', 'screen-usuarios', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
+      ['screen-usuarios', 'screen-detalle'].forEach((s) => $(s).classList.add('hidden'));
       $(screen).classList.remove('hidden');
+    }
+
+    // Si no hay sesion de contador, volvemos al login unico.
+    function alLogin() {
+      token = null; localStorage.removeItem('adminToken');
+      window.location.href = '/';
     }
 
     async function api(path, opts = {}) {
@@ -160,22 +149,7 @@
       return res.json();
     }
 
-    // ---------- Login ----------
-    $('login-btn').addEventListener('click', async () => {
-      const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: $('login-pass').value }) });
-      if (data.token) {
-        token = data.token; localStorage.setItem('adminToken', token);
-        $('login-pass').value = ''; $('login-error').textContent = '';
-        irAUsuarios();
-      } else {
-        $('login-error').textContent = data.error || 'Error al ingresar';
-      }
-    });
-    $('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); });
-
-    $('logout-btn').addEventListener('click', () => {
-      token = null; localStorage.removeItem('adminToken'); show('screen-login');
-    });
+    $('logout-btn').addEventListener('click', alLogin);
 
     // ---------- Lista de usuarios ----------
     async function irAUsuarios() {
@@ -190,7 +164,7 @@
     async function buscarUsuarios() {
       const q = encodeURIComponent($('buscador').value.trim());
       const data = await api('/api/admin/usuarios?q=' + q);
-      if (data.error) { token = null; localStorage.removeItem('adminToken'); show('screen-login'); return; }
+      if (data.error) { alLogin(); return; }
       const cont = $('usuarios-lista');
       cont.innerHTML = '';
       if (!data.usuarios.length) {
@@ -314,8 +288,8 @@
       URL.revokeObjectURL(a.href);
     }
 
-    // ---------- Arranque ----------
-    if (token) irAUsuarios(); else show('screen-login');
+    // ---------- Arranque: sin token de contador, al login unico ----------
+    if (token) irAUsuarios(); else alLogin();
   </script>
 </body>
 </html>
