@@ -41,7 +41,8 @@
     @keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(44px,32px) scale(1.08);} }
     @keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-40px,-26px) scale(1.06);} }
     @media (prefers-reduced-motion: reduce){ .brand-wave { animation:none; } }
-    .form-panel { padding:56px 52px; display:flex; flex-direction:column; justify-content:center; }
+    .form-panel { padding:56px 52px; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+    .form-inner { width:100%; max-width:400px; }
     .tabs { display:flex; gap:22px; border-bottom:1px solid var(--line); }
     .tab { font-family:'Newsreader',serif; font-size:19px; font-weight:500; color:var(--muted); padding-bottom:10px; background:none; border:none; cursor:pointer; }
     .tab.active { font-weight:600; color:var(--ink); border-bottom:2px solid var(--accent); }
@@ -89,6 +90,7 @@
     </div>
 
     <div class="form-panel">
+      <div class="form-inner">
       <div class="brandlock" style="margin-bottom:28px;">
         <svg class="logo-mark" width="27" height="24" viewBox="0 0 24 24" fill="#1f3a52"><rect x="2" y="13" width="4.6" height="8" rx="2.3"/><rect x="9.7" y="8" width="4.6" height="13" rx="2.3"/><rect x="17.4" y="3" width="4.6" height="18" rx="2.3"/></svg>
         <span class="name">Bluema<span style="color:var(--accent);">x</span>p</span>
@@ -118,6 +120,7 @@
 
       <div id="auth-error" class="error"></div>
       <p style="font-size:12.5px; color:var(--muted); text-align:center; margin-top:14px;">One login for everyone — clients and accountants.</p>
+      </div>
     </div>
   </section>
 
