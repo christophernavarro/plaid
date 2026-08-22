@@ -34,12 +34,27 @@
     #screen-auth { min-height:100vh; display:grid; grid-template-columns:0.72fr 1.28fr; }
     @media (max-width:760px){ #screen-auth { grid-template-columns:1fr; } .brand-panel { display:none !important; } }
     .brand-panel { position:relative; overflow:hidden; background:linear-gradient(155deg,#284b6b 0%,#1f3a52 55%,#162b3d 100%); color:#eef2f6; padding:56px 48px; display:flex; flex-direction:column; justify-content:space-between; }
-    .brand-wave { position:absolute; border-radius:45%; filter:blur(55px); opacity:.55; pointer-events:none; }
-    .bw1 { width:460px; height:460px; background:#33608c; top:-150px; left:-90px; animation:drift1 15s ease-in-out infinite; }
-    .bw2 { width:400px; height:400px; background:#173f61; bottom:-170px; right:-70px; animation:drift2 19s ease-in-out infinite; }
-    .bw3 { width:340px; height:340px; background:#2a6f9e; bottom:-40px; left:30%; animation:drift1 23s ease-in-out infinite; opacity:.4; }
-    @keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(44px,32px) scale(1.08);} }
-    @keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-40px,-26px) scale(1.06);} }
+    .brand-wave { position:absolute; border-radius:45%; filter:blur(58px); opacity:.5; pointer-events:none; will-change:transform; }
+    .bw1 { width:440px; height:440px; background:#3a6d9c; top:-120px; left:-80px; animation:wave1 24s ease-in-out infinite; }
+    .bw2 { width:380px; height:380px; background:#173f61; bottom:-150px; right:-70px; animation:wave2 28s ease-in-out infinite; }
+    .bw3 { width:320px; height:320px; background:#2a6f9e; top:38%; left:18%; animation:wave3 32s ease-in-out infinite; }
+    @keyframes wave1 {
+      0%   { transform:translate(0,0) scale(1); }
+      33%  { transform:translate(110px,70px) scale(1.14); }
+      66%  { transform:translate(50px,150px) scale(0.94); }
+      100% { transform:translate(0,0) scale(1); }
+    }
+    @keyframes wave2 {
+      0%   { transform:translate(0,0) scale(1); }
+      33%  { transform:translate(-90px,-60px) scale(1.12); }
+      66%  { transform:translate(-40px,-130px) scale(0.95); }
+      100% { transform:translate(0,0) scale(1); }
+    }
+    @keyframes wave3 {
+      0%   { transform:translate(0,0) scale(1); opacity:.28; }
+      50%  { transform:translate(80px,-50px) scale(1.18); opacity:.46; }
+      100% { transform:translate(0,0) scale(1); opacity:.28; }
+    }
     @media (prefers-reduced-motion: reduce){ .brand-wave { animation:none; } }
     .form-panel { padding:56px 52px; display:flex; flex-direction:column; justify-content:center; align-items:center; }
     .form-inner { width:100%; max-width:400px; }
