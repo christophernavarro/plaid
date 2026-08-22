@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bluemaxp</title>
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Archivo:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
   <style>
     :root {
       --bg:#f4f1ea; --ink:#1c1b18; --muted:#7c766a; --line:#e7e0d0; --panel:#fbf9f3;
       --accent:#1f3a52; --accent2:#2b5578; --pos:#2f6d4f; --neg:#b0553f;
+      --mono:'IBM Plex Mono', ui-monospace, monospace;
     }
     * { box-sizing: border-box; }
     body { margin:0; font-family:'Archivo',system-ui,sans-serif; color:var(--ink); background:var(--bg); }
@@ -74,7 +75,8 @@
     .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:16px; margin-top:26px; }
     .tile { padding:18px 20px; }
     .tile .label { font-size:13px; color:var(--muted); }
-    .tile .value { font-family:'Newsreader',serif; font-size:32px; font-weight:500; margin-top:6px; letter-spacing:-0.01em; }
+    .tile .value { font-family:var(--mono); font-size:28px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+    .money { font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:500; }
     .tile .value.cred { color:var(--pos); } .tile .value.deb { color:var(--neg); }
     .grid2 { display:grid; grid-template-columns:1.5fr 1fr; gap:22px; margin-top:22px; }
     @media (max-width:720px){ .grid2 { grid-template-columns:1fr; } }
@@ -297,7 +299,7 @@
       const ult = txs.slice(0, 8).map((t) => {
         const sign = t.tipo === 'credito' ? '+' : '-';
         const color = t.tipo === 'credito' ? 'var(--pos)' : 'var(--neg)';
-        return `<li><span>${t.fecha} &middot; ${t.descripcion}</span><span class="serif" style="color:${color};font-variant-numeric:tabular-nums">${sign}${fmt(t.monto)}</span></li>`;
+        return `<li><span>${t.fecha} &middot; ${t.descripcion}</span><span class="money" style="color:${color}">${sign}${fmt(t.monto)}</span></li>`;
       }).join('');
       $('ultimos').innerHTML = ult;
       $('dash-nota').textContent = txs.length + ' transactions in your account.';
