@@ -24,6 +24,7 @@ const plaidClient = new PlaidApi(configuration);
 // ==========================================================================
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'contador@bluemaxp.com').trim().toLowerCase();
+const ADMIN_NAME = process.env.ADMIN_NAME || 'Contador';
 
 const usuarios = {};          // userId -> datos del usuario final
 const emailIndex = {};        // email (lower) -> userId
@@ -97,7 +98,7 @@ app.post('/api/login', (req, res) => {
   if (key === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     const token = nuevoId();
     sesionesAdmin.add(token);
-    return res.json({ token, role: 'admin' });
+    return res.json({ token, role: 'admin', nombre: ADMIN_NAME });
   }
 
   // Usuario final

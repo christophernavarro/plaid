@@ -30,8 +30,8 @@
     .btn-primary { background:linear-gradient(180deg,#2b5578,#1f3a52); color:#f4f6f9; border:none; border-radius:11px; padding:11px 20px; font:600 14px 'Archivo',sans-serif; cursor:pointer;
       box-shadow:0 6px 16px rgba(31,58,82,.28), inset 0 1px 0 rgba(255,255,255,.16); transition:transform .15s, box-shadow .15s, filter .15s; display:inline-flex; align-items:center; gap:8px; }
     .btn-primary:hover { transform:translateY(-1px); filter:brightness(1.07); box-shadow:0 10px 22px rgba(31,58,82,.34); }
-    .btn-ghost { background:#fff; border:1px solid var(--line); border-radius:10px; padding:9px 15px; font:500 13px 'Archivo',sans-serif; cursor:pointer; color:var(--ink); transition:border-color .15s, box-shadow .15s, transform .15s; display:inline-flex; align-items:center; gap:7px; }
-    .btn-ghost:hover { border-color:#d3d3d8; box-shadow:0 4px 12px rgba(28,27,24,.06); transform:translateY(-1px); }
+    .btn-ghost { background:#fff; border:1px solid #d7d8dd; border-radius:10px; padding:9px 15px; font:500 13px 'Archivo',sans-serif; cursor:pointer; color:var(--ink); box-shadow:0 1px 2px rgba(18,20,28,.06); transition:border-color .15s, box-shadow .15s, transform .15s; display:inline-flex; align-items:center; gap:7px; }
+    .btn-ghost:hover { border-color:#c3c5cc; box-shadow:0 5px 14px rgba(18,20,28,.10); transform:translateY(-1px); }
     .btn-link { background:none; border:none; color:var(--accent); padding:0; cursor:pointer; font:14px 'Archivo',sans-serif; text-decoration:underline; }
 
     .field { padding:11px 13px; font-size:14px; border:1px solid var(--line); border-radius:10px; background:#fff; font-family:'Archivo',sans-serif; box-shadow:inset 0 1px 2px rgba(28,27,24,.04); transition:border-color .15s, box-shadow .15s; }
@@ -39,7 +39,7 @@
     .search { width:100%; padding:13px 14px 13px 42px; }
 
     .card { background:linear-gradient(180deg,#ffffff,#fafbfc); border:1px solid #e8e8ec; border-radius:14px; box-shadow:0 1px 2px rgba(18,20,28,.04), 0 12px 30px rgba(18,20,28,.05); }
-    .user-card { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 18px; margin-top:12px; }
+    .user-card { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px; margin-top:12px; }
     .av { width:38px; height:38px; border-radius:50%; background:linear-gradient(145deg,#eaf0f5,#dbe5ef); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; font-weight:600; font-size:15px; box-shadow:inset 0 1px 0 rgba(255,255,255,.7); flex:none; }
     .av.dark { background:linear-gradient(145deg,#2b5578,#183048); color:#f4f6f9; }
     .badge { font-size:12px; padding:3px 11px; border-radius:999px; font-weight:600; }
@@ -79,14 +79,15 @@
       </div>
 
       <div style="margin-top:30px;">
-        <div style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted);">Cartera de clientes</div>
-        <h1 class="serif" style="font-size:38px; font-weight:500; margin:8px 0 0; letter-spacing:-0.02em;">Usuarios</h1>
+        <div style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted);">Panel del contador</div>
+        <h1 class="serif" id="saludo-contador" style="font-size:38px; font-weight:500; margin:8px 0 0; letter-spacing:-0.02em; text-transform:capitalize;">Hola</h1>
       </div>
 
-      <div style="position:relative; margin-top:20px;">
+      <div style="position:relative; margin-top:24px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="position:absolute; left:14px; top:14px;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input class="field search" id="buscador" placeholder="Buscar usuario por nombre o email...">
       </div>
+      <div style="font-size:13px; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-top:22px;">Tus clientes</div>
       <div id="usuarios-lista"></div>
     </section>
 
@@ -96,7 +97,7 @@
       <div class="head">
         <span class="av dark" id="detalle-avatar" style="width:52px; height:52px; font-size:22px;"></span>
         <div>
-          <h1 class="serif" id="detalle-nombre" style="font-size:30px; font-weight:500; margin:0; letter-spacing:-0.01em;"></h1>
+          <h1 class="serif" id="detalle-nombre" style="font-size:30px; font-weight:500; margin:0; letter-spacing:-0.01em; text-transform:capitalize;"></h1>
           <div class="muted" id="detalle-sub"></div>
         </div>
       </div>
@@ -155,6 +156,7 @@
     // ---------- Lista de usuarios ----------
     async function irAUsuarios() {
       if (pollTimer) clearInterval(pollTimer);
+      $('saludo-contador').textContent = 'Hola, ' + (localStorage.getItem('adminName') || 'Contador');
       show('screen-usuarios');
       buscarUsuarios();
     }
@@ -178,11 +180,11 @@
         const badge = u.conectado ? '<span class="badge ok">Conectado</span>' : '<span class="badge pend">Sin banco</span>';
         const inicial = (u.nombre[0] || '?').toUpperCase();
         div.innerHTML = `
-          <div style="display:flex; align-items:center; gap:12px;">
+          <div style="display:flex; align-items:center; gap:14px;">
             <span class="av">${inicial}</span>
             <div>
-              <div style="font-weight:600;">${u.nombre} ${badge}</div>
-              <div class="muted">${u.email} &middot; ${u.cantidadCuentas} cuentas &middot; ${u.cantidadTransacciones} movimientos</div>
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-weight:600; font-size:15px; text-transform:capitalize;">${u.nombre}</span> ${badge}</div>
+              <div class="muted" style="margin-top:4px;">${u.email} &middot; ${u.cantidadCuentas} cuentas &middot; ${u.cantidadTransacciones} movimientos</div>
             </div>
           </div>
           <button class="btn-ghost">Ver &rarr;</button>
