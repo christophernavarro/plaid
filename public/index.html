@@ -72,10 +72,11 @@
     .greet-eyebrow { font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
     .pill { border:1px solid var(--line); border-radius:999px; padding:9px 18px; font-size:14px; color:#3a3f47; background:var(--panel); box-shadow:0 2px 8px rgba(28,27,24,.05); }
     .card { background:linear-gradient(180deg,#ffffff,#fafbfc); border:1px solid #e8e8ec; border-radius:18px; box-shadow:0 1px 2px rgba(18,20,28,.04), 0 14px 34px rgba(18,20,28,.06); }
-    .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:16px; margin-top:26px; }
-    .tile { padding:18px 20px; }
+    .tiles { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; margin-top:26px; }
+    @media (max-width:520px){ .tiles { grid-template-columns:1fr; } }
+    .tile { padding:22px 24px; min-width:0; }
     .tile .label { font-size:13px; color:var(--muted); }
-    .tile .value { font-family:var(--mono); font-size:28px; font-weight:600; margin-top:8px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+    .tile .value { font-family:var(--mono); font-size:26px; font-weight:600; margin-top:10px; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .money { font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:500; }
     .tile .value.cred { color:var(--pos); } .tile .value.deb { color:var(--neg); }
     .grid2 { display:grid; grid-template-columns:1.5fr 1fr; gap:22px; margin-top:22px; }
