@@ -62,6 +62,45 @@
     .head { display:flex; align-items:center; gap:14px; margin-top:14px; }
     .filtros { margin-top:12px; gap:10px; }
     .filtros label { font-size:13px; color:var(--muted); }
+
+    /* Tarjetas clickeables */
+    .tile.clickable { cursor:pointer; position:relative; transition:transform .12s ease, box-shadow .12s ease; }
+    .tile.clickable:hover { transform:translateY(-2px); box-shadow:0 2px 4px rgba(18,20,28,.05), 0 16px 38px rgba(18,20,28,.11); }
+    .tile .go { position:absolute; top:14px; right:16px; color:var(--muted); opacity:0; transition:opacity .12s; }
+    .tile.clickable:hover .go { opacity:1; }
+
+    /* Cuentas seleccionables */
+    tr.acc-row { cursor:pointer; }
+    tr.acc-row td { transition:background .12s; }
+    tr.acc-row:hover td { background:#f6f7f9; }
+    tr.acc-row.sel td { background:#eef2f6; }
+    tr.acc-row td:first-child { border-left:3px solid transparent; padding-left:8px; }
+    tr.acc-row.sel td:first-child { border-left:3px solid var(--accent); }
+    .chip-cuenta { display:inline-flex; align-items:center; gap:9px; background:#eef2f6; color:var(--accent); border-radius:999px; padding:6px 8px 6px 13px; font-size:13px; font-weight:500; }
+    .chip-cuenta button { background:none; border:none; color:var(--accent); cursor:pointer; font-size:16px; line-height:1; padding:0 3px; border-radius:50%; }
+    .chip-cuenta button:hover { background:#dbe4ee; }
+
+    /* Modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(18,20,28,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
+    .modal { background:#fff; border:1px solid #e8e8ec; border-radius:18px; width:100%; max-width:560px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(18,20,28,.28); }
+    .modal-head { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 24px 12px; }
+    .modal-eyebrow { font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+    .modal-head h3 { font-family:'Newsreader',serif; font-size:26px; font-weight:600; margin:4px 0 0; letter-spacing:-0.01em; }
+    .modal-x { background:none; border:none; font-size:24px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 6px; border-radius:8px; }
+    .modal-x:hover { color:var(--ink); background:#f1f1f3; }
+    .modal-controls { display:flex; gap:10px; padding:4px 24px 12px; }
+    .modal-searchwrap { position:relative; flex:1; }
+    .modal-searchwrap svg { position:absolute; left:13px; top:12px; }
+    .modal-controls input { width:100%; padding:11px 12px 11px 40px; border:1px solid var(--line); border-radius:10px; font:14px 'Archivo',sans-serif; box-sizing:border-box; }
+    .modal-controls input:focus { outline:none; border-color:#9db4c8; box-shadow:0 0 0 3px rgba(31,58,82,.12); }
+    .modal-controls select { border:1px solid var(--line); border-radius:10px; padding:11px 12px; font:14px 'Archivo',sans-serif; background:#fff; cursor:pointer; }
+    .modal-summary { padding:0 24px 10px; font-size:13px; color:var(--muted); }
+    .modal-list { overflow-y:auto; padding:0 24px 22px; }
+    .modal-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+    .modal-row:last-child { border-bottom:none; }
+    .modal-row .desc { font-size:14px; }
+    .modal-row .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .modal-row .amt { font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:500; white-space:nowrap; }
   </style>
 </head>
 <body>
@@ -118,9 +157,35 @@
         <button class="btn-primary" id="exportar-btn" style="margin-left:auto;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Exportar CSV</button>
       </div>
+      <div id="filtro-cuenta" style="margin-top:10px;"></div>
       <div id="tx-box" class="panel msg">Sin datos todavia.</div>
     </section>
 
+  </div>
+
+  <!-- ================= MODAL ================= -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <div class="modal-eyebrow" id="modal-eyebrow"></div>
+          <h3 id="modal-title"></h3>
+        </div>
+        <button class="modal-x" id="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-controls">
+        <div class="modal-searchwrap">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="modal-search" placeholder="Buscar...">
+        </div>
+        <select id="modal-sort">
+          <option value="desc">Mayor a menor</option>
+          <option value="asc">Menor a mayor</option>
+        </select>
+      </div>
+      <div class="modal-summary" id="modal-summary"></div>
+      <div class="modal-list" id="modal-list"></div>
+    </div>
   </div>
 
   <script>
@@ -129,6 +194,9 @@
     let nombreActual = '';
     let pollTimer = null;
     let datos = { accounts: [], transactions: [] };
+    let cuentaSeleccionada = null;
+    const modalState = {};
+    const flecha = '<svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8"/></svg>';
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -203,6 +271,7 @@
       $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
       $('detalle-estado').textContent = '';
       $('tiles').classList.add('hidden');
+      cuentaSeleccionada = null; $('filtro-cuenta').innerHTML = '';
       $('f-desde').value = ''; $('f-hasta').value = '';
       $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Cargando...';
       $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Cargando...';
@@ -227,9 +296,11 @@
       if (!data.accounts.length) {
         $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Sin cuentas todavia.';
       } else {
-        let html = '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
+        let html = '<div class="muted" style="padding:8px 8px 0;">Selecciona una cuenta para filtrar sus movimientos.</div>';
+        html += '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
         data.accounts.forEach((a) => {
-          html += `<tr><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
+          const sel = cuentaSeleccionada === a.id ? ' sel' : '';
+          html += `<tr class="acc-row${sel}" data-acc="${a.id}"><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
         });
         html += '</tbody></table>';
         $('cuentas-box').className = 'panel'; $('cuentas-box').innerHTML = html;
@@ -247,25 +318,47 @@
     }
     function nombreCuenta(id) { const a = datos.accounts.find((x) => x.id === id); return a ? a.nombre : ''; }
 
+    // Movimientos que ve la tabla: filtro por fecha + cuenta seleccionada.
+    function transaccionesTabla() {
+      let txs = transaccionesFiltradas();
+      if (cuentaSeleccionada) txs = txs.filter((t) => t.cuenta === cuentaSeleccionada);
+      return txs;
+    }
+
     function renderMovimientos() {
-      const txs = transaccionesFiltradas();
-      const totalDeb = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
-      const totalCred = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
+      const porFecha = transaccionesFiltradas();
+      const totalDeb = porFecha.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
+      const totalCred = porFecha.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
       const saldoTotal = datos.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
 
       if (datos.transactions.length || datos.accounts.length) {
         $('tiles').classList.remove('hidden');
         $('tiles').innerHTML = `
-          <div class="card tile"><div class="label">Cuentas</div><div class="value">${datos.accounts.length}</div></div>
-          <div class="card tile"><div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
-          <div class="card tile"><div class="label">Movimientos</div><div class="value">${txs.length}</div></div>
-          <div class="card tile"><div class="label">Debitos</div><div class="value deb">${fmt(totalDeb)}</div></div>
-          <div class="card tile"><div class="label">Creditos</div><div class="value cred">${fmt(totalCred)}</div></div>
+          <div class="card tile clickable" data-tile="cuentas">${flecha}<div class="label">Cuentas</div><div class="value">${datos.accounts.length}</div></div>
+          <div class="card tile clickable" data-tile="saldo">${flecha}<div class="label">Saldo total</div><div class="value">${fmt(saldoTotal)}</div></div>
+          <div class="card tile clickable" data-tile="movimientos">${flecha}<div class="label">Movimientos</div><div class="value">${porFecha.length}</div></div>
+          <div class="card tile clickable" data-tile="debitos">${flecha}<div class="label">Debitos</div><div class="value deb">${fmt(totalDeb)}</div></div>
+          <div class="card tile clickable" data-tile="creditos">${flecha}<div class="label">Creditos</div><div class="value cred">${fmt(totalCred)}</div></div>
         `;
       }
 
+      // Chip de la cuenta seleccionada (filtra los movimientos de abajo)
+      if (cuentaSeleccionada) {
+        const a = datos.accounts.find((x) => x.id === cuentaSeleccionada);
+        $('filtro-cuenta').innerHTML = `<span class="chip-cuenta">Cuenta: ${a ? a.nombre : ''} <button id="limpiar-cuenta" title="Quitar filtro">&times;</button></span>`;
+        const b = $('limpiar-cuenta');
+        if (b) b.addEventListener('click', () => {
+          cuentaSeleccionada = null;
+          $('cuentas-box').querySelectorAll('tr[data-acc]').forEach((r) => r.classList.remove('sel'));
+          renderMovimientos();
+        });
+      } else {
+        $('filtro-cuenta').innerHTML = '';
+      }
+
+      const txs = transaccionesTabla();
       if (!datos.transactions.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Sin movimientos todavia.'; return; }
-      if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos en el rango elegido.'; return; }
+      if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos con los filtros elegidos.'; return; }
       let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
       txs.forEach((t) => {
         html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
@@ -275,8 +368,8 @@
     }
 
     function exportarCSV() {
-      const txs = transaccionesFiltradas();
-      if (!txs.length) { alert('No hay movimientos para exportar en ese rango.'); return; }
+      const txs = transaccionesTabla();
+      if (!txs.length) { alert('No hay movimientos para exportar con esos filtros.'); return; }
       const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
       const filas = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Monto']];
       txs.forEach((t) => filas.push([t.fecha, t.descripcion, nombreCuenta(t.cuenta), t.tipo, t.monto.toFixed(2)]));
@@ -289,6 +382,73 @@
       a.download = `movimientos_${nombre}_${desde}_${hasta}.csv`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
+    }
+
+    // ---------- Seleccion de cuenta (filtra los movimientos) ----------
+    $('cuentas-box').addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-acc]');
+      if (!tr) return;
+      const id = tr.dataset.acc;
+      cuentaSeleccionada = (cuentaSeleccionada === id) ? null : id;
+      $('cuentas-box').querySelectorAll('tr[data-acc]').forEach((r) => r.classList.toggle('sel', r.dataset.acc === cuentaSeleccionada));
+      renderMovimientos();
+    });
+
+    // ---------- Modal de detalle de cada tarjeta ----------
+    $('tiles').addEventListener('click', (e) => {
+      const t = e.target.closest('.tile');
+      if (t && t.dataset.tile) abrirModal(t.dataset.tile);
+    });
+    $('modal-close').addEventListener('click', cerrarModal);
+    $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
+    $('modal-search').addEventListener('input', renderModal);
+    $('modal-sort').addEventListener('change', renderModal);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+
+    function abrirModal(tipo) {
+      const txs = datos.transactions || [];
+      const accs = datos.accounts || [];
+      modalState.mixto = false; modalState.signo = ''; modalState.color = '';
+      if (tipo === 'cuentas') { modalState.mode = 'acc'; modalState.items = accs; modalState.titulo = 'Cuentas'; modalState.eyebrow = 'Cuentas del cliente'; }
+      else if (tipo === 'saldo') { modalState.mode = 'acc'; modalState.items = accs; modalState.titulo = 'Saldo total'; modalState.eyebrow = 'Por cuenta'; }
+      else if (tipo === 'debitos') { modalState.mode = 'tx'; modalState.signo = '-'; modalState.color = 'var(--neg)'; modalState.items = txs.filter((t) => t.tipo === 'debito'); modalState.titulo = 'Debitos'; modalState.eyebrow = 'Gastos'; }
+      else if (tipo === 'creditos') { modalState.mode = 'tx'; modalState.signo = '+'; modalState.color = 'var(--pos)'; modalState.items = txs.filter((t) => t.tipo === 'credito'); modalState.titulo = 'Creditos'; modalState.eyebrow = 'Ingresos'; }
+      else { modalState.mode = 'tx'; modalState.mixto = true; modalState.items = txs.slice(); modalState.titulo = 'Movimientos'; modalState.eyebrow = 'Todos'; }
+      $('modal-eyebrow').textContent = modalState.eyebrow;
+      $('modal-title').textContent = modalState.titulo;
+      $('modal-search').value = '';
+      $('modal-sort').value = 'desc';
+      $('modal').classList.remove('hidden');
+      renderModal();
+    }
+    function cerrarModal() { $('modal').classList.add('hidden'); }
+
+    function renderModal() {
+      const q = $('modal-search').value.trim().toLowerCase();
+      const dir = $('modal-sort').value;
+      const vacio = '<p style="padding:16px 0; color:var(--muted); font-size:13px;">Sin resultados.</p>';
+      let items = (modalState.items || []).slice();
+
+      if (modalState.mode === 'tx') {
+        if (q) items = items.filter((t) => (t.descripcion || '').toLowerCase().includes(q) || t.fecha.includes(q) || nombreCuenta(t.cuenta).toLowerCase().includes(q));
+        items.sort((a, b) => dir === 'desc' ? b.monto - a.monto : a.monto - b.monto);
+        const total = items.reduce((s, t) => s + t.monto, 0);
+        $('modal-summary').textContent = items.length + ' movimientos · ' + fmt(total);
+        $('modal-list').innerHTML = items.map((t) => {
+          const esCred = t.tipo === 'credito';
+          const color = modalState.mixto ? (esCred ? 'var(--pos)' : 'var(--neg)') : modalState.color;
+          const signo = modalState.mixto ? (esCred ? '+' : '-') : modalState.signo;
+          return `<div class="modal-row"><div><div class="desc">${t.descripcion}</div><div class="sub">${t.fecha} · ${nombreCuenta(t.cuenta)}</div></div><div class="amt" style="color:${color}">${signo}${fmt(t.monto)}</div></div>`;
+        }).join('') || vacio;
+      } else {
+        if (q) items = items.filter((a) => (a.nombre || '').toLowerCase().includes(q) || (a.tipo || '').toLowerCase().includes(q));
+        items.sort((a, b) => dir === 'desc' ? (b.saldo || 0) - (a.saldo || 0) : (a.saldo || 0) - (b.saldo || 0));
+        const total = items.reduce((s, a) => s + (a.saldo || 0), 0);
+        $('modal-summary').textContent = items.length + ' cuentas · ' + fmt(total) + ' total';
+        $('modal-list').innerHTML = items.map((a) =>
+          `<div class="modal-row"><div><div class="desc">${a.nombre}</div><div class="sub">${a.tipo}${a.mask ? ' ·••' + a.mask : ''}</div></div><div class="amt">${fmt(a.saldo)} ${a.moneda || ''}</div></div>`
+        ).join('') || vacio;
+      }
     }
 
     // ---------- Arranque: sin token de contador, al login unico ----------
