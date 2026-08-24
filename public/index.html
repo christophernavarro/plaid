@@ -88,6 +88,34 @@
     ul.mov li { display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--line); font-size:14px; }
     ul.mov li:last-child { border-bottom:none; }
     .connect-box { border:1px solid #e8e8ec; background:linear-gradient(180deg,#ffffff,#f8f9fb); border-radius:22px; padding:52px; text-align:center; max-width:560px; margin:30px auto 0; box-shadow:0 2px 4px rgba(18,20,28,.04), 0 24px 60px rgba(18,20,28,.09); }
+
+    /* Tarjetas clickeables */
+    .tile.clickable { cursor:pointer; position:relative; transition:transform .12s ease, box-shadow .12s ease; }
+    .tile.clickable:hover { transform:translateY(-2px); box-shadow:0 2px 4px rgba(18,20,28,.05), 0 18px 42px rgba(18,20,28,.11); }
+    .tile .go { position:absolute; top:16px; right:18px; color:var(--muted); opacity:0; transition:opacity .12s; }
+    .tile.clickable:hover .go { opacity:1; }
+
+    /* Modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(18,20,28,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
+    .modal { background:#fff; border:1px solid #e8e8ec; border-radius:18px; width:100%; max-width:560px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(18,20,28,.28); }
+    .modal-head { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 24px 12px; }
+    .modal-eyebrow { font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+    .modal-head h3 { font-family:'Newsreader',serif; font-size:26px; font-weight:600; margin:4px 0 0; letter-spacing:-0.01em; }
+    .modal-x { background:none; border:none; font-size:24px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 6px; border-radius:8px; }
+    .modal-x:hover { color:var(--ink); background:#f1f1f3; }
+    .modal-controls { display:flex; gap:10px; padding:4px 24px 12px; }
+    .modal-searchwrap { position:relative; flex:1; }
+    .modal-searchwrap svg { position:absolute; left:13px; top:12px; }
+    .modal-controls input { width:100%; padding:11px 12px 11px 40px; border:1px solid var(--line); border-radius:10px; font:14px 'Archivo',sans-serif; box-sizing:border-box; }
+    .modal-controls input:focus { outline:none; border-color:#9db4c8; box-shadow:0 0 0 3px rgba(31,58,82,.12); }
+    .modal-controls select { border:1px solid var(--line); border-radius:10px; padding:11px 12px; font:14px 'Archivo',sans-serif; background:#fff; cursor:pointer; }
+    .modal-summary { padding:0 24px 10px; font-size:13px; color:var(--muted); }
+    .modal-list { overflow-y:auto; padding:0 24px 22px; }
+    .modal-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+    .modal-row:last-child { border-bottom:none; }
+    .modal-row .desc { font-size:14px; }
+    .modal-row .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .modal-row .amt { font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:500; white-space:nowrap; }
   </style>
 </head>
 <body>
@@ -197,9 +225,36 @@
     </div>
   </section>
 
+  <!-- ================= MODAL ================= -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <div class="modal-eyebrow" id="modal-eyebrow"></div>
+          <h3 id="modal-title"></h3>
+        </div>
+        <button class="modal-x" id="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-controls">
+        <div class="modal-searchwrap">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="modal-search" placeholder="Search...">
+        </div>
+        <select id="modal-sort">
+          <option value="desc">Highest first</option>
+          <option value="asc">Lowest first</option>
+        </select>
+      </div>
+      <div class="modal-summary" id="modal-summary"></div>
+      <div class="modal-list" id="modal-list"></div>
+    </div>
+  </div>
+
   <script>
     let token = localStorage.getItem('userToken') || null;
     let pollTimer = null;
+    let datosUsuario = null;
+    const modalState = {};
 
     const $ = (id) => document.getElementById(id);
     const fmt = (n) => (n == null ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -282,17 +337,20 @@
       render(data);
     }
 
+    const flecha = '<svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+
     function render(data) {
+      datosUsuario = data;
       const txs = data.transactions;
       const income = txs.filter((t) => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
       const expenses = txs.filter((t) => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
       const balance = data.accounts.reduce((s, a) => s + (a.saldo || 0), 0);
 
       $('tiles').innerHTML = `
-        <div class="card tile"><div class="label">Total balance</div><div class="value">${fmt(balance)}</div></div>
-        <div class="card tile"><div class="label">Income</div><div class="value cred">${fmt(income)}</div></div>
-        <div class="card tile"><div class="label">Expenses</div><div class="value deb">${fmt(expenses)}</div></div>
-        <div class="card tile"><div class="label">Accounts</div><div class="value">${data.accounts.length}</div></div>
+        <div class="card tile clickable" data-tile="balance">${flecha}<div class="label">Total balance</div><div class="value">${fmt(balance)}</div></div>
+        <div class="card tile clickable" data-tile="income">${flecha}<div class="label">Income</div><div class="value cred">${fmt(income)}</div></div>
+        <div class="card tile clickable" data-tile="expenses">${flecha}<div class="label">Expenses</div><div class="value deb">${fmt(expenses)}</div></div>
+        <div class="card tile clickable" data-tile="accounts">${flecha}<div class="label">Accounts</div><div class="value">${data.accounts.length}</div></div>
       `;
 
       $('grafico').innerHTML = graficoMensual(txs);
@@ -364,6 +422,59 @@
       });
       handler.open();
     });
+
+    // ---------- Modal de detalle de cada tarjeta ----------
+    $('tiles').addEventListener('click', (e) => {
+      const t = e.target.closest('.tile');
+      if (t && t.dataset.tile) abrirModal(t.dataset.tile);
+    });
+    $('modal-close').addEventListener('click', cerrarModal);
+    $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
+    $('modal-search').addEventListener('input', renderModal);
+    $('modal-sort').addEventListener('change', renderModal);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+
+    function abrirModal(tipo) {
+      if (!datosUsuario) return;
+      const txs = datosUsuario.transactions || [];
+      const accs = datosUsuario.accounts || [];
+      if (tipo === 'income') { modalState.mode = 'tx'; modalState.signo = '+'; modalState.color = 'var(--pos)'; modalState.items = txs.filter((t) => t.tipo === 'credito'); modalState.titulo = 'Income'; modalState.eyebrow = 'Credits'; }
+      else if (tipo === 'expenses') { modalState.mode = 'tx'; modalState.signo = '-'; modalState.color = 'var(--neg)'; modalState.items = txs.filter((t) => t.tipo === 'debito'); modalState.titulo = 'Expenses'; modalState.eyebrow = 'Debits'; }
+      else if (tipo === 'accounts') { modalState.mode = 'acc'; modalState.items = accs; modalState.titulo = 'Accounts'; modalState.eyebrow = 'Your accounts'; }
+      else { modalState.mode = 'acc'; modalState.items = accs; modalState.titulo = 'Total balance'; modalState.eyebrow = 'By account'; }
+      $('modal-eyebrow').textContent = modalState.eyebrow;
+      $('modal-title').textContent = modalState.titulo;
+      $('modal-search').value = '';
+      $('modal-sort').value = 'desc';
+      $('modal').classList.remove('hidden');
+      renderModal();
+    }
+    function cerrarModal() { $('modal').classList.add('hidden'); }
+
+    function renderModal() {
+      const q = $('modal-search').value.trim().toLowerCase();
+      const dir = $('modal-sort').value;
+      const vacio = '<p style="padding:16px 0; color:var(--muted); font-size:13px;">No matches.</p>';
+      let items = (modalState.items || []).slice();
+
+      if (modalState.mode === 'tx') {
+        if (q) items = items.filter((t) => (t.descripcion || '').toLowerCase().includes(q) || t.fecha.includes(q));
+        items.sort((a, b) => dir === 'desc' ? b.monto - a.monto : a.monto - b.monto);
+        const total = items.reduce((s, t) => s + t.monto, 0);
+        $('modal-summary').textContent = items.length + ' movements · ' + fmt(total);
+        $('modal-list').innerHTML = items.map((t) =>
+          `<div class="modal-row"><div><div class="desc">${t.descripcion}</div><div class="sub">${t.fecha}</div></div><div class="amt" style="color:${modalState.color}">${modalState.signo}${fmt(t.monto)}</div></div>`
+        ).join('') || vacio;
+      } else {
+        if (q) items = items.filter((a) => (a.nombre || '').toLowerCase().includes(q) || (a.tipo || '').toLowerCase().includes(q));
+        items.sort((a, b) => dir === 'desc' ? (b.saldo || 0) - (a.saldo || 0) : (a.saldo || 0) - (b.saldo || 0));
+        const total = items.reduce((s, a) => s + (a.saldo || 0), 0);
+        $('modal-summary').textContent = items.length + ' accounts · ' + fmt(total) + ' total';
+        $('modal-list').innerHTML = items.map((a) =>
+          `<div class="modal-row"><div><div class="desc">${a.nombre}</div><div class="sub">${a.tipo}${a.mask ? ' ·••' + a.mask : ''}</div></div><div class="amt">${fmt(a.saldo)} ${a.moneda || ''}</div></div>`
+        ).join('') || vacio;
+      }
+    }
 
     // ---------- Start ----------
     if (token) irADashboard(); else show('screen-auth');
