@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -7,7 +8,13 @@ const { PlaidApi, Configuration, PlaidEnvironments, Products, CountryCode } = re
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(cors());
+
+// In production, serve the React build
+const clientBuild = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientBuild)) {
+  app.use(express.static(clientBuild));
+}
 
 // --- Config del cliente de Plaid ---
 const configuration = new Configuration({
@@ -336,5 +343,15 @@ function formatAccount(a) {
   };
 }
 
+// SPA fallback: any non-API route serves the React app
+app.get('*', (req, res) => {
+  const index = path.join(clientBuild, 'index.html');
+  if (fs.existsSync(index)) {
+    res.sendFile(index);
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Demo corriendo en http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server corriendo en http://localhost:${PORT}`));
