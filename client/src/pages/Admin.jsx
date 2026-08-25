@@ -3,13 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { api, fmt } from '../lib/api';
 
 export default function Admin() {
-  const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [view, setView] = useState('list');
   const [usuarios, setUsuarios] = useState([]);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState(null); // { id, nombre, email }
+  const [selected, setSelected] = useState(null);
   const [datos, setDatos] = useState(null);
+  const [recurring, setRecurring] = useState([]);
+  const [liabilities, setLiabilities] = useState(null);
+  const [investments, setInvestments] = useState(null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [activeTab, setActiveTab] = useState('movimientos');
   const navigate = useNavigate();
   const adminName = localStorage.getItem('adminName') || 'Contador';
 
@@ -19,7 +23,6 @@ export default function Admin() {
     navigate('/');
   }
 
-  // Search users
   const buscar = useCallback(async () => {
     const data = await api(`/api/admin/usuarios?q=${encodeURIComponent(query)}`);
     if (data.error) { logout(); return; }
@@ -31,13 +34,23 @@ export default function Admin() {
     return () => clearTimeout(t);
   }, [buscar]);
 
-  // Load user detail
   async function verUsuario(u) {
     setSelected(u);
     setView('detail');
     setDesde(''); setHasta('');
+    setActiveTab('movimientos');
+    setRecurring([]); setLiabilities(null); setInvestments(null);
     const data = await api(`/api/admin/usuarios/${u.id}/datos`);
     setDatos(data);
+    // Fetch extra data
+    const [recRes, liabRes, invRes] = await Promise.all([
+      api(`/api/admin/usuarios/${u.id}/recurring`),
+      api(`/api/admin/usuarios/${u.id}/liabilities`),
+      api(`/api/admin/usuarios/${u.id}/investments`),
+    ]);
+    if (recRes.recurring) setRecurring(recRes.recurring);
+    if (liabRes.liabilities) setLiabilities(liabRes);
+    if (invRes.holdings) setInvestments(invRes);
   }
 
   async function refresh() {
@@ -59,10 +72,10 @@ export default function Admin() {
     const txs = filteredTxs();
     if (!txs.length) { alert('No hay movimientos para exportar.'); return; }
     const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const rows = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Monto']];
+    const rows = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Categoria', 'Canal', 'Estado', 'Monto']];
     txs.forEach(t => {
       const accName = datos.accounts?.find(a => a.id === t.cuenta)?.nombre || '';
-      rows.push([t.fecha, t.descripcion, accName, t.tipo, t.monto.toFixed(2)]);
+      rows.push([t.fecha, t.descripcion, accName, t.tipo, t.categoria || '', t.canal || '', t.pendiente ? 'Pendiente' : 'Confirmado', t.monto.toFixed(2)]);
     });
     const csv = '\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\r\n');
     const nombre = (selected?.nombre || 'user').replace(/[^a-z0-9]+/gi, '_');
@@ -137,7 +150,7 @@ export default function Admin() {
                   <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} cuentas &middot; {u.cantidadTransacciones} movimientos</div>
                 </div>
               </div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300 group-hover:text-brand-600 transition-colors">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
                 <path d="M9 6l6 6-6 6"/>
               </svg>
             </div>
@@ -154,7 +167,7 @@ export default function Admin() {
   const saldoTotal = (datos?.accounts || []).reduce((s, a) => s + (a.saldo || 0), 0);
 
   return (
-    <div className="max-w-[940px] mx-auto px-5 py-8 pb-16">
+    <div className="max-w-[1000px] mx-auto px-5 py-8 pb-16">
       <button onClick={() => { setView('list'); setDatos(null); }} className="text-brand-600 text-sm underline">
         &larr; Volver a usuarios
       </button>
@@ -187,7 +200,7 @@ export default function Admin() {
         <p className="text-gray-400 text-sm mt-6">Cargando...</p>
       ) : (
         <>
-          {/* Tiles */}
+          {/* Summary tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
             <MiniTile label="Cuentas" value={datos.accounts?.length || 0} />
             <MiniTile label="Saldo total" value={fmt(saldoTotal)} />
@@ -196,87 +209,185 @@ export default function Admin() {
             <MiniTile label="Creditos" value={fmt(totalCred)} className="text-pos" />
           </div>
 
-          {/* Accounts table */}
-          <h3 className="font-serif text-xl font-semibold mt-8">Cuentas</h3>
-          {datos.accounts?.length ? (
-            <div className="mt-3 border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">N°</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Saldo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {datos.accounts.map(a => (
-                    <tr key={a.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">{a.nombre}</td>
-                      <td className="px-4 py-3">{a.tipo}</td>
-                      <td className="px-4 py-3">{a.mask}</td>
-                      <td className="px-4 py-3 text-right font-mono font-medium">{fmt(a.saldo)} {a.moneda}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-sm mt-3">Sin cuentas todavia.</p>
-          )}
-
-          {/* Transactions */}
-          <h3 className="font-serif text-xl font-semibold mt-8">Movimientos</h3>
-          <div className="flex flex-wrap items-center gap-3 mt-3">
-            <label className="text-xs text-gray-400">Desde
-              <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
-            </label>
-            <label className="text-xs text-gray-400">Hasta
-              <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
-            </label>
-            <button onClick={() => { setDesde(''); setHasta(''); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Limpiar</button>
-            <button onClick={exportCSV} className="ml-auto flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-sm rounded-[11px] shadow-lg shadow-brand-600/25 hover:brightness-110 hover:-translate-y-0.5 transition-all">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-              Exportar CSV
-            </button>
+          {/* Tabs */}
+          <div className="flex gap-1 mt-6 border-b border-gray-200 overflow-x-auto">
+            {[
+              { key: 'movimientos', label: 'Movimientos' },
+              { key: 'cuentas', label: 'Cuentas' },
+              { key: 'recurrentes', label: 'Recurrentes' },
+              { key: 'deudas', label: 'Deudas' },
+              { key: 'inversiones', label: 'Inversiones' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? 'border-brand-600 text-gray-900'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="text-xs text-gray-400 mt-2">{txs.length} movimiento(s)</div>
 
-          {txs.length ? (
-            <div className="mt-3 border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Fecha</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {txs.slice(0, 50).map((t, i) => {
-                    const accName = datos.accounts?.find(a => a.id === t.cuenta)?.nombre || '';
-                    return (
-                      <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">{t.fecha}</td>
-                        <td className="px-4 py-3">{t.descripcion}</td>
-                        <td className="px-4 py-3">{accName}</td>
-                        <td className={`px-4 py-3 ${t.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>{t.tipo}</td>
-                        <td className="px-4 py-3 text-right font-mono font-medium">{fmt(t.monto)}</td>
+          {/* TAB: Movimientos */}
+          {activeTab === 'movimientos' && (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="text-xs text-gray-400">Desde
+                  <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
+                </label>
+                <label className="text-xs text-gray-400">Hasta
+                  <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
+                </label>
+                <button onClick={() => { setDesde(''); setHasta(''); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Limpiar</button>
+                <button onClick={exportCSV} className="ml-auto flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-sm rounded-[11px] shadow-lg shadow-brand-600/25 hover:brightness-110 hover:-translate-y-0.5 transition-all">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+                  Exportar CSV
+                </button>
+              </div>
+              <div className="text-xs text-gray-400 mt-2">{txs.length} movimiento(s)</div>
+
+              {txs.length ? (
+                <div className="mt-3 border border-gray-200 rounded-[14px] overflow-hidden shadow-sm overflow-x-auto">
+                  <table className="w-full text-sm min-w-[700px]">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Fecha</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Categoria</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Canal</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {txs.length > 50 && (
-                <div className="text-center py-3 text-xs text-gray-400 border-t border-gray-100">
-                  Mostrando 50 de {txs.length}. Exporta a CSV para ver todos.
+                    </thead>
+                    <tbody>
+                      {txs.slice(0, 100).map((t, i) => (
+                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-2.5 whitespace-nowrap">{t.fecha}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {t.logo && <img src={t.logo} alt="" className="w-5 h-5 rounded-full" />}
+                              <span className="truncate max-w-[180px]">{t.descripcion}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500">{formatCategory(t.categoria)}</td>
+                          <td className="px-3 py-2.5 text-xs">
+                            {t.canal === 'in store' && <span title="En tienda">🏪</span>}
+                            {t.canal === 'online' && <span title="Online">🌐</span>}
+                            {t.canal === 'other' && <span title="Otro">💳</span>}
+                            {!t.canal && '-'}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {t.pendiente
+                              ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold border border-amber-200">Pend.</span>
+                              : <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Conf.</span>
+                            }
+                          </td>
+                          <td className={`px-3 py-2.5 ${t.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>{t.tipo}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-medium">{fmt(t.monto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {txs.length > 100 && (
+                    <div className="text-center py-3 text-xs text-gray-400 border-t border-gray-100">
+                      Mostrando 100 de {txs.length}. Exporta a CSV para ver todos.
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <p className="text-gray-400 text-sm mt-3">No hay movimientos con esos filtros.</p>
               )}
             </div>
-          ) : (
-            <p className="text-gray-400 text-sm mt-3">No hay movimientos con esos filtros.</p>
+          )}
+
+          {/* TAB: Cuentas */}
+          {activeTab === 'cuentas' && (
+            <div className="mt-4">
+              {datos.accounts?.length ? (
+                <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">N°</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datos.accounts.map(a => (
+                        <tr key={a.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">{a.nombre}</td>
+                          <td className="px-4 py-3">{a.tipo}</td>
+                          <td className="px-4 py-3">{a.mask}</td>
+                          <td className="px-4 py-3 text-right font-mono font-medium">{fmt(a.saldo)} {a.moneda}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm mt-3">Sin cuentas todavia.</p>
+              )}
+            </div>
+          )}
+
+          {/* TAB: Recurrentes */}
+          {activeTab === 'recurrentes' && (
+            <div className="mt-4">
+              {recurring.length ? (
+                <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Frecuencia</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Categoria</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Ultima fecha</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recurring.map((r, i) => (
+                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">{r.descripcion}</td>
+                          <td className="px-4 py-3 text-xs">{formatFreq(r.frecuencia)}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{formatCategory(r.categoria)}</td>
+                          <td className="px-4 py-3">
+                            {r.estado === 'MATURE'
+                              ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Activo</span>
+                              : <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 font-semibold border border-gray-200">{r.estado || '-'}</span>
+                            }
+                          </td>
+                          <td className={`px-4 py-3 ${r.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>{r.tipo}</td>
+                          <td className="px-4 py-3 text-xs">{r.ultimaFecha || '-'}</td>
+                          <td className="px-4 py-3 text-right font-mono font-medium">{fmt(r.monto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm mt-3">No se detectaron transacciones recurrentes.</p>
+              )}
+            </div>
+          )}
+
+          {/* TAB: Deudas */}
+          {activeTab === 'deudas' && (
+            <AdminLiabilitiesTab liabilities={liabilities} accounts={datos?.accounts || []} />
+          )}
+
+          {/* TAB: Inversiones */}
+          {activeTab === 'inversiones' && (
+            <AdminInvestmentsTab investments={investments} />
           )}
         </>
       )}
@@ -284,11 +395,188 @@ export default function Admin() {
   );
 }
 
+// Helper functions
+function formatCategory(cat) {
+  if (!cat) return '-';
+  return cat.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
+}
+
+function formatFreq(freq) {
+  const map = { WEEKLY: 'Semanal', BIWEEKLY: 'Quincenal', SEMI_MONTHLY: 'Bimensual', MONTHLY: 'Mensual', ANNUALLY: 'Anual' };
+  return map[freq] || freq || '-';
+}
+
 function MiniTile({ label, value, className = '' }) {
   return (
     <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] p-4 shadow-sm">
       <div className="text-[11px] text-gray-400">{label}</div>
       <div className={`font-mono text-lg font-semibold mt-1.5 tracking-tight tabular-nums ${className}`}>{value}</div>
+    </div>
+  );
+}
+
+function AdminLiabilitiesTab({ liabilities, accounts }) {
+  if (!liabilities || (!liabilities.liabilities?.credit?.length && !liabilities.liabilities?.student?.length && !liabilities.liabilities?.mortgage?.length)) {
+    return <p className="text-gray-400 text-sm mt-6">No se encontraron deudas para este usuario.</p>;
+  }
+
+  const { credit = [], student = [], mortgage = [] } = liabilities.liabilities;
+  const getAccName = (id) => {
+    const a = (liabilities.accounts || accounts || []).find(x => x.id === id);
+    return a ? a.nombre : '';
+  };
+
+  return (
+    <div className="mt-4 space-y-6">
+      {credit.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Tarjetas de credito</h4>
+          <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Balance</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Pago min.</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">APR</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {credit.map((c, i) => (
+                  <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">{getAccName(c.accountId) || 'Tarjeta'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(c.ultimoEstado)}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(c.pagoMinimo)}</td>
+                    <td className="px-4 py-3 text-xs">{c.proximoPago || '-'}</td>
+                    <td className="px-4 py-3 text-xs font-mono">{c.aprs?.[0]?.apr_percentage ? `${c.aprs[0].apr_percentage}%` : '-'}</td>
+                    <td className="px-4 py-3">
+                      {c.sobreVencido
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-neg font-semibold border border-red-200">Vencido</span>
+                        : <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Al dia</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {student.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Prestamos estudiantiles</h4>
+          <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Prestamo</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Original</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tasa</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Pago min.</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
+                </tr>
+              </thead>
+              <tbody>
+                {student.map((s, i) => (
+                  <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">{s.nombre || 'Prestamo'}</td>
+                    <td className="px-4 py-3 text-xs">{s.estado || '-'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(s.balanceOriginal)}</td>
+                    <td className="px-4 py-3 text-xs font-mono">{s.tasaInteres != null ? `${s.tasaInteres}%` : '-'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(s.pagoMinimo)}</td>
+                    <td className="px-4 py-3 text-xs">{s.proximoPago || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {mortgage.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Hipotecas</h4>
+          <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tasa</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto original</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Ultimo pago</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Desde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mortgage.map((m, i) => (
+                  <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">{m.tipo || 'Hipoteca'}</td>
+                    <td className="px-4 py-3 text-xs font-mono">{m.tasaInteres != null ? `${m.tasaInteres}%` : '-'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(m.montoOriginal)}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(m.ultimoPago)}</td>
+                    <td className="px-4 py-3 text-xs">{m.proximoPago || '-'}</td>
+                    <td className="px-4 py-3 text-xs">{m.plazoOriginal || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminInvestmentsTab({ investments }) {
+  if (!investments || !investments.holdings?.length) {
+    return <p className="text-gray-400 text-sm mt-6">No se encontraron inversiones para este usuario.</p>;
+  }
+
+  const { holdings } = investments;
+  const totalValue = holdings.reduce((s, h) => s + (h.valorTotal || 0), 0);
+  const totalCost = holdings.reduce((s, h) => s + (h.costoBase || 0), 0);
+
+  return (
+    <div className="mt-4">
+      <div className="grid sm:grid-cols-3 gap-3 mb-4">
+        <MiniTile label="Valor total" value={fmt(totalValue)} />
+        <MiniTile label="Costo base" value={fmt(totalCost)} />
+        <MiniTile label="Ganancia/Perdida" value={fmt(totalValue - totalCost)} className={totalValue - totalCost >= 0 ? 'text-pos' : 'text-neg'} />
+      </div>
+
+      <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-left">
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Security</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Ticker</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Cantidad</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Precio</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Valor</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Costo base</th>
+            </tr>
+          </thead>
+          <tbody>
+            {holdings.map((h, i) => (
+              <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-3">{h.security?.nombre || '-'}</td>
+                <td className="px-4 py-3 font-mono text-xs">{h.security?.ticker || '-'}</td>
+                <td className="px-4 py-3 text-xs">{h.security?.tipo || '-'}</td>
+                <td className="px-4 py-3 text-right font-mono">{h.cantidad}</td>
+                <td className="px-4 py-3 text-right font-mono">{fmt(h.precioUnitario)}</td>
+                <td className="px-4 py-3 text-right font-mono font-medium">{fmt(h.valorTotal)}</td>
+                <td className="px-4 py-3 text-right font-mono">{fmt(h.costoBase)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

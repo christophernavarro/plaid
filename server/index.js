@@ -160,7 +160,7 @@ app.post('/api/mi/create_link_token', requiereUsuario, async (req, res) => {
     const response = await plaidClient.linkTokenCreate({
       user: { client_user_id: req.usuario.id },
       client_name: 'Bluemax',
-      products: [Products.Transactions],
+      products: [Products.Transactions, Products.Liabilities, Products.Investments],
       country_codes: [CountryCode.Us],
       language: 'es',
       transactions: { days_requested: 730 },
@@ -203,6 +203,157 @@ app.get('/api/mi/datos', requiereUsuario, async (req, res) => {
   }
 });
 
+// --- Recurring transactions ---
+app.get('/api/mi/recurring', requiereUsuario, async (req, res) => {
+  try {
+    if (!req.usuario.accessToken) return res.json({ recurring: [] });
+    const response = await plaidClient.transactionsRecurringGet({
+      access_token: req.usuario.accessToken,
+      account_ids: req.usuario.accounts.map(a => a.id),
+    });
+    const format = (streams, tipo) => streams.map(s => ({
+      id: s.stream_id,
+      descripcion: s.merchant_name || s.description,
+      monto: s.average_amount ? Math.abs(s.average_amount.amount) : null,
+      moneda: s.average_amount ? s.average_amount.iso_currency_code : 'USD',
+      frecuencia: s.frequency,
+      categoria: s.personal_finance_category ? s.personal_finance_category.primary : null,
+      ultimaFecha: s.last_date,
+      estado: s.status,
+      tipo,
+    }));
+    const recurring = [
+      ...format(response.data.inflow_streams || [], 'credito'),
+      ...format(response.data.outflow_streams || [], 'debito'),
+    ];
+    res.json({ recurring });
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las transacciones recurrentes' });
+  }
+});
+
+// --- Real-time balance ---
+app.get('/api/mi/balance', requiereUsuario, async (req, res) => {
+  try {
+    if (!req.usuario.accessToken) return res.json({ accounts: [] });
+    const response = await plaidClient.accountsBalanceGet({
+      access_token: req.usuario.accessToken,
+    });
+    const accounts = response.data.accounts.map(a => ({
+      id: a.account_id,
+      nombre: a.official_name || a.name,
+      tipo: a.subtype || a.type,
+      mask: a.mask || '',
+      saldoActual: a.balances.current,
+      saldoDisponible: a.balances.available,
+      limite: a.balances.limit,
+      moneda: a.balances.iso_currency_code || 'USD',
+    }));
+    res.json({ accounts });
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudo obtener el saldo en tiempo real' });
+  }
+});
+
+// --- Liabilities ---
+app.get('/api/mi/liabilities', requiereUsuario, async (req, res) => {
+  try {
+    if (!req.usuario.accessToken) return res.json({ liabilities: {} });
+    const response = await plaidClient.liabilitiesGet({
+      access_token: req.usuario.accessToken,
+    });
+    const data = response.data.liabilities;
+    const liabilities = {
+      credit: (data.credit || []).map(c => ({
+        accountId: c.account_id,
+        aprs: c.aprs || [],
+        ultimoPago: c.last_payment_amount,
+        fechaUltimoPago: c.last_payment_date,
+        ultimoEstado: c.last_statement_balance,
+        fechaEstado: c.last_statement_issue_date,
+        pagoMinimo: c.minimum_payment_amount,
+        proximoPago: c.next_payment_due_date,
+        sobreVencido: c.is_overdue,
+      })),
+      student: (data.student || []).map(s => ({
+        accountId: s.account_id,
+        nombre: s.loan_name,
+        estado: s.loan_status ? s.loan_status.type : null,
+        balanceOriginal: s.origination_principal_amount,
+        tasaInteres: s.interest_rate_percentage,
+        pagoMinimo: s.minimum_payment_amount,
+        proximoPago: s.next_payment_due_date,
+        sobreVencido: s.is_overdue,
+      })),
+      mortgage: (data.mortgage || []).map(m => ({
+        accountId: m.account_id,
+        tipo: m.loan_type_description,
+        tasaInteres: m.interest_rate ? m.interest_rate.percentage : null,
+        ultimoPago: m.last_payment_amount,
+        fechaUltimoPago: m.last_payment_date,
+        proximoPago: m.next_payment_due_date,
+        plazoOriginal: m.origination_date,
+        montoOriginal: m.origination_principal_amount,
+      })),
+    };
+    res.json({ liabilities, accounts: response.data.accounts.map(formatAccount) });
+  } catch (err) {
+    // If liabilities not supported for this item, return empty
+    const code = err.response?.data?.error_code;
+    if (code === 'PRODUCTS_NOT_SUPPORTED' || code === 'NO_LIABILITIES_ACCOUNTS') {
+      return res.json({ liabilities: { credit: [], student: [], mortgage: [] }, accounts: [] });
+    }
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las deudas' });
+  }
+});
+
+// --- Investments ---
+app.get('/api/mi/investments', requiereUsuario, async (req, res) => {
+  try {
+    if (!req.usuario.accessToken) return res.json({ holdings: [], securities: [], accounts: [] });
+    const response = await plaidClient.investmentsHoldingsGet({
+      access_token: req.usuario.accessToken,
+    });
+    const securities = {};
+    (response.data.securities || []).forEach(s => {
+      securities[s.security_id] = {
+        id: s.security_id,
+        nombre: s.name,
+        ticker: s.ticker_symbol,
+        tipo: s.type,
+        precioActual: s.close_price,
+        fechaPrecio: s.close_price_as_of,
+        moneda: s.iso_currency_code || 'USD',
+      };
+    });
+    const holdings = (response.data.holdings || []).map(h => ({
+      accountId: h.account_id,
+      securityId: h.security_id,
+      cantidad: h.quantity,
+      precioUnitario: h.institution_price,
+      valorTotal: h.institution_value,
+      costoBase: h.cost_basis,
+      moneda: h.iso_currency_code || 'USD',
+      security: securities[h.security_id] || null,
+    }));
+    res.json({
+      holdings,
+      securities: Object.values(securities),
+      accounts: response.data.accounts.map(formatAccount),
+    });
+  } catch (err) {
+    const code = err.response?.data?.error_code;
+    if (code === 'PRODUCTS_NOT_SUPPORTED' || code === 'NO_INVESTMENT_ACCOUNTS') {
+      return res.json({ holdings: [], securities: [], accounts: [] });
+    }
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las inversiones' });
+  }
+});
+
 // ==========================================================================
 // Admin / contador: ve a TODOS los usuarios y su data completa
 // ==========================================================================
@@ -239,6 +390,130 @@ app.get('/api/admin/usuarios/:id/datos', requiereAdmin, async (req, res) => {
   } catch (err) {
     console.error(err.response ? err.response.data : err);
     res.status(500).json({ error: 'No se pudieron traer los datos del usuario' });
+  }
+});
+
+// Admin: recurring transactions for a specific user
+app.get('/api/admin/usuarios/:id/recurring', requiereAdmin, async (req, res) => {
+  const u = usuarios[req.params.id];
+  if (!u) return res.status(404).json({ error: 'Usuario no existe' });
+  try {
+    if (!u.accessToken) return res.json({ recurring: [] });
+    const response = await plaidClient.transactionsRecurringGet({
+      access_token: u.accessToken,
+      account_ids: u.accounts.map(a => a.id),
+    });
+    const format = (streams, tipo) => streams.map(s => ({
+      id: s.stream_id,
+      descripcion: s.merchant_name || s.description,
+      monto: s.average_amount ? Math.abs(s.average_amount.amount) : null,
+      moneda: s.average_amount ? s.average_amount.iso_currency_code : 'USD',
+      frecuencia: s.frequency,
+      categoria: s.personal_finance_category ? s.personal_finance_category.primary : null,
+      ultimaFecha: s.last_date,
+      estado: s.status,
+      tipo,
+    }));
+    const recurring = [
+      ...format(response.data.inflow_streams || [], 'credito'),
+      ...format(response.data.outflow_streams || [], 'debito'),
+    ];
+    res.json({ recurring });
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las transacciones recurrentes' });
+  }
+});
+
+// Admin: liabilities for a specific user
+app.get('/api/admin/usuarios/:id/liabilities', requiereAdmin, async (req, res) => {
+  const u = usuarios[req.params.id];
+  if (!u) return res.status(404).json({ error: 'Usuario no existe' });
+  try {
+    if (!u.accessToken) return res.json({ liabilities: { credit: [], student: [], mortgage: [] }, accounts: [] });
+    const response = await plaidClient.liabilitiesGet({ access_token: u.accessToken });
+    const data = response.data.liabilities;
+    const liabilities = {
+      credit: (data.credit || []).map(c => ({
+        accountId: c.account_id,
+        aprs: c.aprs || [],
+        ultimoPago: c.last_payment_amount,
+        fechaUltimoPago: c.last_payment_date,
+        ultimoEstado: c.last_statement_balance,
+        fechaEstado: c.last_statement_issue_date,
+        pagoMinimo: c.minimum_payment_amount,
+        proximoPago: c.next_payment_due_date,
+        sobreVencido: c.is_overdue,
+      })),
+      student: (data.student || []).map(s => ({
+        accountId: s.account_id,
+        nombre: s.loan_name,
+        estado: s.loan_status ? s.loan_status.type : null,
+        balanceOriginal: s.origination_principal_amount,
+        tasaInteres: s.interest_rate_percentage,
+        pagoMinimo: s.minimum_payment_amount,
+        proximoPago: s.next_payment_due_date,
+        sobreVencido: s.is_overdue,
+      })),
+      mortgage: (data.mortgage || []).map(m => ({
+        accountId: m.account_id,
+        tipo: m.loan_type_description,
+        tasaInteres: m.interest_rate ? m.interest_rate.percentage : null,
+        ultimoPago: m.last_payment_amount,
+        fechaUltimoPago: m.last_payment_date,
+        proximoPago: m.next_payment_due_date,
+        plazoOriginal: m.origination_date,
+        montoOriginal: m.origination_principal_amount,
+      })),
+    };
+    res.json({ liabilities, accounts: response.data.accounts.map(formatAccount) });
+  } catch (err) {
+    const code = err.response?.data?.error_code;
+    if (code === 'PRODUCTS_NOT_SUPPORTED' || code === 'NO_LIABILITIES_ACCOUNTS') {
+      return res.json({ liabilities: { credit: [], student: [], mortgage: [] }, accounts: [] });
+    }
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las deudas' });
+  }
+});
+
+// Admin: investments for a specific user
+app.get('/api/admin/usuarios/:id/investments', requiereAdmin, async (req, res) => {
+  const u = usuarios[req.params.id];
+  if (!u) return res.status(404).json({ error: 'Usuario no existe' });
+  try {
+    if (!u.accessToken) return res.json({ holdings: [], securities: [], accounts: [] });
+    const response = await plaidClient.investmentsHoldingsGet({ access_token: u.accessToken });
+    const securities = {};
+    (response.data.securities || []).forEach(s => {
+      securities[s.security_id] = {
+        id: s.security_id,
+        nombre: s.name,
+        ticker: s.ticker_symbol,
+        tipo: s.type,
+        precioActual: s.close_price,
+        fechaPrecio: s.close_price_as_of,
+        moneda: s.iso_currency_code || 'USD',
+      };
+    });
+    const holdings = (response.data.holdings || []).map(h => ({
+      accountId: h.account_id,
+      securityId: h.security_id,
+      cantidad: h.quantity,
+      precioUnitario: h.institution_price,
+      valorTotal: h.institution_value,
+      costoBase: h.cost_basis,
+      moneda: h.iso_currency_code || 'USD',
+      security: securities[h.security_id] || null,
+    }));
+    res.json({ holdings, securities: Object.values(securities), accounts: response.data.accounts.map(formatAccount) });
+  } catch (err) {
+    const code = err.response?.data?.error_code;
+    if (code === 'PRODUCTS_NOT_SUPPORTED' || code === 'NO_INVESTMENT_ACCOUNTS') {
+      return res.json({ holdings: [], securities: [], accounts: [] });
+    }
+    console.error(err.response ? err.response.data : err);
+    res.status(500).json({ error: 'No se pudieron traer las inversiones' });
   }
 });
 
@@ -329,6 +604,21 @@ function formatTransaction(t) {
     monto: Math.abs(t.amount),
     tipo: t.amount > 0 ? 'debito' : 'credito',
     cuenta: t.account_id,
+    categoria: t.personal_finance_category ? t.personal_finance_category.primary : null,
+    categoriaDetalle: t.personal_finance_category ? t.personal_finance_category.detailed : null,
+    categoriaIcono: t.personal_finance_category_icon_url || null,
+    logo: t.logo_url || null,
+    website: t.website || null,
+    canal: t.payment_channel || null,
+    pendiente: t.pending || false,
+    ubicacion: t.location ? {
+      ciudad: t.location.city,
+      region: t.location.region,
+      pais: t.location.country,
+      lat: t.location.lat,
+      lon: t.location.lon,
+    } : null,
+    merchantId: t.merchant_entity_id || null,
   };
 }
 
