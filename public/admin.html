@@ -69,13 +69,14 @@
     .tile .go { position:absolute; top:14px; right:16px; color:var(--muted); opacity:0; transition:opacity .12s; }
     .tile.clickable:hover .go { opacity:1; }
 
-    /* Cuentas seleccionables */
-    tr.acc-row { cursor:pointer; }
+    /* Cuentas seleccionables (checkboxes) */
+    input[type="checkbox"] { accent-color:var(--accent); width:16px; height:16px; cursor:pointer; margin:0; vertical-align:middle; }
     tr.acc-row td { transition:background .12s; }
     tr.acc-row:hover td { background:#f6f7f9; }
-    tr.acc-row.sel td { background:#eef2f6; }
-    tr.acc-row td:first-child { border-left:3px solid transparent; padding-left:8px; }
-    tr.acc-row.sel td:first-child { border-left:3px solid var(--accent); }
+    tr.acc-row:has(.chk-acc:checked) td { background:#eef2f6; }
+    tr.acc-row td:first-child { width:40px; text-align:center; border-left:3px solid transparent; }
+    tr.acc-row:has(.chk-acc:checked) td:first-child { border-left:3px solid var(--accent); }
+    #siguiente-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:0 6px 16px rgba(31,58,82,.18); filter:none; }
     .chip-cuenta { display:inline-flex; align-items:center; gap:9px; background:#eef2f6; color:var(--accent); border-radius:999px; padding:6px 8px 6px 13px; font-size:13px; font-weight:500; }
     .chip-cuenta button { background:none; border:none; color:var(--accent); cursor:pointer; font-size:16px; line-height:1; padding:0 3px; border-radius:50%; }
     .chip-cuenta button:hover { background:#dbe4ee; }
@@ -147,18 +148,26 @@
 
       <h3 class="sectitle">Cuentas</h3>
       <div id="cuentas-box" class="panel msg">Sin datos todavia.</div>
-
-      <h3 class="sectitle">Movimientos</h3>
-      <div class="row filtros">
-        <label>Desde <input class="field" type="date" id="f-desde"></label>
-        <label>Hasta <input class="field" type="date" id="f-hasta"></label>
-        <button class="btn-ghost" id="aplicar-btn">Aplicar</button>
-        <button class="btn-ghost" id="limpiar-btn">Limpiar</button>
-        <button class="btn-primary" id="exportar-btn" style="margin-left:auto;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Exportar CSV</button>
+      <div id="cuentas-accion" class="hidden" style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+        <button class="btn-primary" id="siguiente-btn" disabled>Siguiente
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <span class="muted" id="sel-count"></span>
       </div>
-      <div id="filtro-cuenta" style="margin-top:10px;"></div>
-      <div id="tx-box" class="panel msg">Sin datos todavia.</div>
+
+      <div id="movimientos-section" class="hidden">
+        <h3 class="sectitle">Movimientos</h3>
+        <div id="filtro-cuenta" style="margin:0 0 12px;"></div>
+        <div class="row filtros" style="margin-top:0;">
+          <label>Desde <input class="field" type="date" id="f-desde"></label>
+          <label>Hasta <input class="field" type="date" id="f-hasta"></label>
+          <button class="btn-ghost" id="aplicar-btn">Aplicar</button>
+          <button class="btn-ghost" id="limpiar-btn">Limpiar</button>
+          <button class="btn-primary" id="exportar-btn" style="margin-left:auto;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Exportar CSV</button>
+        </div>
+        <div id="tx-box" class="panel msg">Sin datos todavia.</div>
+      </div>
     </section>
 
   </div>
@@ -194,7 +203,9 @@
     let nombreActual = '';
     let pollTimer = null;
     let datos = { accounts: [], transactions: [] };
-    let cuentaSeleccionada = null;
+    let cuentasSeleccionadas = new Set(); // marcadas con checkbox (pendiente)
+    let cuentasAplicadas = new Set();     // las que muestran los movimientos (tras Siguiente)
+    let mostrarMov = false;
     const modalState = {};
     const flecha = '<svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8"/></svg>';
 
@@ -271,7 +282,8 @@
       $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
       $('detalle-estado').textContent = '';
       $('tiles').classList.add('hidden');
-      cuentaSeleccionada = null; $('filtro-cuenta').innerHTML = '';
+      cuentasSeleccionadas = new Set(); cuentasAplicadas = new Set(); mostrarMov = false;
+      $('cuentas-accion').classList.add('hidden'); $('movimientos-section').classList.add('hidden');
       $('f-desde').value = ''; $('f-hasta').value = '';
       $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Cargando...';
       $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Cargando...';
@@ -293,18 +305,7 @@
       datos = data;
       $('detalle-estado').textContent = data.conectado ? 'Banco conectado.' : 'El usuario todavia no conecto su banco.';
 
-      if (!data.accounts.length) {
-        $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Sin cuentas todavia.';
-      } else {
-        let html = '<div class="muted" style="padding:8px 8px 0;">Selecciona una cuenta para filtrar sus movimientos.</div>';
-        html += '<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
-        data.accounts.forEach((a) => {
-          const sel = cuentaSeleccionada === a.id ? ' sel' : '';
-          html += `<tr class="acc-row${sel}" data-acc="${a.id}"><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
-        });
-        html += '</tbody></table>';
-        $('cuentas-box').className = 'panel'; $('cuentas-box').innerHTML = html;
-      }
+      renderCuentas();
       renderMovimientos();
     }
 
@@ -318,11 +319,38 @@
     }
     function nombreCuenta(id) { const a = datos.accounts.find((x) => x.id === id); return a ? a.nombre : ''; }
 
-    // Movimientos que ve la tabla: filtro por fecha + cuenta seleccionada.
+    // Movimientos que ve la tabla: fecha + cuentas aplicadas (tras Siguiente).
     function transaccionesTabla() {
       let txs = transaccionesFiltradas();
-      if (cuentaSeleccionada) txs = txs.filter((t) => t.cuenta === cuentaSeleccionada);
+      if (cuentasAplicadas.size) txs = txs.filter((t) => cuentasAplicadas.has(t.cuenta));
       return txs;
+    }
+
+    // Tabla de cuentas con checkboxes (uno por cuenta + seleccionar todos).
+    function renderCuentas() {
+      if (!datos.accounts.length) {
+        $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Sin cuentas todavia.';
+        $('cuentas-accion').classList.add('hidden');
+        return;
+      }
+      let html = '<table><thead><tr><th style="width:40px; text-align:center;"><input type="checkbox" id="chk-all"></th><th>Cuenta</th><th>Tipo</th><th>N&deg;</th><th class="num">Saldo</th></tr></thead><tbody>';
+      datos.accounts.forEach((a) => {
+        const ck = cuentasSeleccionadas.has(a.id) ? ' checked' : '';
+        html += `<tr class="acc-row"><td style="text-align:center;"><input type="checkbox" class="chk-acc" data-acc="${a.id}"${ck}></td><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.mask}</td><td class="num">${fmt(a.saldo)} ${a.moneda}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      $('cuentas-box').className = 'panel'; $('cuentas-box').innerHTML = html;
+      $('cuentas-accion').classList.remove('hidden');
+      actualizarAccion();
+    }
+
+    function actualizarAccion() {
+      const n = cuentasSeleccionadas.size;
+      const total = datos.accounts.length;
+      $('siguiente-btn').disabled = n === 0;
+      $('sel-count').textContent = n ? (n + ' de ' + total + ' cuentas seleccionadas') : 'Selecciona una o mas cuentas';
+      const all = $('chk-all');
+      if (all) { all.checked = total > 0 && n === total; all.indeterminate = n > 0 && n < total; }
     }
 
     function renderMovimientos() {
@@ -342,22 +370,20 @@
         `;
       }
 
-      // Chip de la cuenta seleccionada (filtra los movimientos de abajo)
-      if (cuentaSeleccionada) {
-        const a = datos.accounts.find((x) => x.id === cuentaSeleccionada);
-        $('filtro-cuenta').innerHTML = `<span class="chip-cuenta">Cuenta: ${a ? a.nombre : ''} <button id="limpiar-cuenta" title="Quitar filtro">&times;</button></span>`;
-        const b = $('limpiar-cuenta');
-        if (b) b.addEventListener('click', () => {
-          cuentaSeleccionada = null;
-          $('cuentas-box').querySelectorAll('tr[data-acc]').forEach((r) => r.classList.remove('sel'));
-          renderMovimientos();
-        });
-      } else {
-        $('filtro-cuenta').innerHTML = '';
-      }
+      // La seccion de movimientos solo aparece despues de "Siguiente".
+      if (!mostrarMov) { $('movimientos-section').classList.add('hidden'); return; }
+      $('movimientos-section').classList.remove('hidden');
+
+      const nombres = datos.accounts.filter((a) => cuentasAplicadas.has(a.id)).map((a) => a.nombre);
+      $('filtro-cuenta').innerHTML = `<span class="chip-cuenta">${nombres.length} cuenta(s): ${nombres.join(', ')} <button id="cambiar-cuentas" title="Cambiar seleccion">&times;</button></span>`;
+      const cb = $('cambiar-cuentas');
+      if (cb) cb.addEventListener('click', () => {
+        mostrarMov = false;
+        $('movimientos-section').classList.add('hidden');
+        $('cuentas-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
 
       const txs = transaccionesTabla();
-      if (!datos.transactions.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Sin movimientos todavia.'; return; }
       if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos con los filtros elegidos.'; return; }
       let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
       txs.forEach((t) => {
@@ -384,14 +410,26 @@
       URL.revokeObjectURL(a.href);
     }
 
-    // ---------- Seleccion de cuenta (filtra los movimientos) ----------
-    $('cuentas-box').addEventListener('click', (e) => {
-      const tr = e.target.closest('tr[data-acc]');
-      if (!tr) return;
-      const id = tr.dataset.acc;
-      cuentaSeleccionada = (cuentaSeleccionada === id) ? null : id;
-      $('cuentas-box').querySelectorAll('tr[data-acc]').forEach((r) => r.classList.toggle('sel', r.dataset.acc === cuentaSeleccionada));
+    // ---------- Seleccion de cuentas (checkboxes) ----------
+    $('cuentas-box').addEventListener('change', (e) => {
+      if (e.target.id === 'chk-all') {
+        cuentasSeleccionadas = new Set();
+        if (e.target.checked) datos.accounts.forEach((a) => cuentasSeleccionadas.add(a.id));
+        $('cuentas-box').querySelectorAll('.chk-acc').forEach((c) => { c.checked = e.target.checked; });
+        actualizarAccion();
+      } else if (e.target.classList.contains('chk-acc')) {
+        const id = e.target.dataset.acc;
+        if (e.target.checked) cuentasSeleccionadas.add(id); else cuentasSeleccionadas.delete(id);
+        actualizarAccion();
+      }
+    });
+    // Boton "Siguiente": recien aca aparecen los movimientos de lo seleccionado.
+    $('siguiente-btn').addEventListener('click', () => {
+      if (!cuentasSeleccionadas.size) return;
+      cuentasAplicadas = new Set(cuentasSeleccionadas);
+      mostrarMov = true;
       renderMovimientos();
+      $('movimientos-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     // ---------- Modal de detalle de cada tarjeta ----------
