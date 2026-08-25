@@ -152,18 +152,23 @@
 
       <div id="tiles" class="tiles hidden"></div>
 
-      <h3 class="sectitle">Cuentas</h3>
-      <div id="cuentas-box" class="panel msg">Sin datos todavia.</div>
-      <div id="cuentas-accion" class="hidden" style="display:flex; align-items:center; gap:14px; margin-top:14px;">
-        <button class="btn-primary" id="siguiente-btn" disabled>Siguiente
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </button>
-        <span class="muted" id="sel-count"></span>
+      <div id="cuentas-section">
+        <h3 class="sectitle">Cuentas</h3>
+        <div id="cuentas-box" class="panel msg">Sin datos todavia.</div>
+        <div id="cuentas-accion" class="hidden" style="display:flex; align-items:center; gap:14px; margin-top:14px;">
+          <button class="btn-primary" id="siguiente-btn" disabled>Siguiente
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <span class="muted" id="sel-count"></span>
+        </div>
       </div>
 
       <div id="movimientos-section" class="hidden">
-        <h3 class="sectitle">Movimientos</h3>
-        <div id="filtro-cuenta" style="margin:0 0 12px;"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:32px;">
+          <h3 class="sectitle" style="margin:0;">Movimientos</h3>
+          <button class="btn-ghost" id="volver-cuentas-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Volver a cuentas</button>
+        </div>
+        <div id="filtro-cuenta" style="margin:12px 0;"></div>
         <div class="row filtros" style="margin-top:0;">
           <label>Desde <input class="field" type="date" id="f-desde"></label>
           <label>Hasta <input class="field" type="date" id="f-hasta"></label>
@@ -289,7 +294,9 @@
       $('detalle-estado').textContent = '';
       $('tiles').classList.add('hidden');
       cuentasSeleccionadas = new Set(); cuentasAplicadas = new Set(); mostrarMov = false;
-      $('cuentas-accion').classList.add('hidden'); $('movimientos-section').classList.add('hidden');
+      $('cuentas-accion').classList.add('hidden');
+      $('cuentas-section').classList.remove('hidden');
+      $('movimientos-section').classList.add('hidden');
       $('f-desde').value = ''; $('f-hasta').value = '';
       $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = 'Cargando...';
       $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'Cargando...';
@@ -378,18 +385,18 @@
         `;
       }
 
-      // La seccion de movimientos solo aparece despues de "Siguiente".
-      if (!mostrarMov) { $('movimientos-section').classList.add('hidden'); return; }
+      // Paso 2: si NO estamos en movimientos, mostramos cuentas y ocultamos movimientos.
+      if (!mostrarMov) {
+        $('cuentas-section').classList.remove('hidden');
+        $('movimientos-section').classList.add('hidden');
+        return;
+      }
+      // Paso 2 activo: ocultamos cuentas y mostramos movimientos.
+      $('cuentas-section').classList.add('hidden');
       $('movimientos-section').classList.remove('hidden');
 
       const nombres = datos.accounts.filter((a) => cuentasAplicadas.has(a.id)).map((a) => a.nombre);
-      $('filtro-cuenta').innerHTML = `<span class="chip-cuenta">${nombres.length} cuenta(s): ${nombres.join(', ')} <button id="cambiar-cuentas" title="Cambiar seleccion">&times;</button></span>`;
-      const cb = $('cambiar-cuentas');
-      if (cb) cb.addEventListener('click', () => {
-        mostrarMov = false;
-        $('movimientos-section').classList.add('hidden');
-        $('cuentas-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
+      $('filtro-cuenta').innerHTML = `<span class="chip-cuenta" style="cursor:default;">Mostrando ${nombres.length} cuenta(s): ${nombres.join(', ')}</span>`;
 
       const txs = transaccionesTabla();
       if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos con los filtros elegidos.'; return; }
@@ -437,7 +444,14 @@
       cuentasAplicadas = new Set(cuentasSeleccionadas);
       mostrarMov = true;
       renderMovimientos();
-      $('movimientos-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    // Volver al paso 1 (cuentas), manteniendo la seleccion.
+    $('volver-cuentas-btn').addEventListener('click', () => {
+      mostrarMov = false;
+      $('movimientos-section').classList.add('hidden');
+      $('cuentas-section').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     // ---------- Modal de detalle de cada tarjeta ----------
