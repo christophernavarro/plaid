@@ -178,6 +178,9 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Exportar CSV</button>
         </div>
         <div id="tx-box" class="panel msg">Sin datos todavia.</div>
+        <div id="mas-wrap" class="hidden" style="text-align:center; margin-top:14px;">
+          <button class="btn-ghost" id="mostrar-mas"></button>
+        </div>
       </div>
     </section>
 
@@ -217,6 +220,8 @@
     let cuentasSeleccionadas = new Set(); // marcadas con checkbox (pendiente)
     let cuentasAplicadas = new Set();     // las que muestran los movimientos (tras Siguiente)
     let mostrarMov = false;
+    const PAGE_MOV = 25;            // movimientos por pagina
+    let movShown = PAGE_MOV;        // cuantos se ven ahora
     const modalState = {};
     const flecha = '<svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8"/></svg>';
 
@@ -293,7 +298,7 @@
       $('detalle-avatar').textContent = (nombre[0] || '?').toUpperCase();
       $('detalle-estado').textContent = '';
       $('tiles').classList.add('hidden');
-      cuentasSeleccionadas = new Set(); cuentasAplicadas = new Set(); mostrarMov = false;
+      cuentasSeleccionadas = new Set(); cuentasAplicadas = new Set(); mostrarMov = false; movShown = PAGE_MOV;
       $('cuentas-accion').classList.add('hidden');
       $('cuentas-section').classList.remove('hidden');
       $('movimientos-section').classList.add('hidden');
@@ -308,8 +313,9 @@
 
     $('volver-btn').addEventListener('click', irAUsuarios);
     $('refresh-btn').addEventListener('click', cargarDatos);
-    $('aplicar-btn').addEventListener('click', renderMovimientos);
-    $('limpiar-btn').addEventListener('click', () => { $('f-desde').value = ''; $('f-hasta').value = ''; renderMovimientos(); });
+    $('aplicar-btn').addEventListener('click', () => { movShown = PAGE_MOV; renderMovimientos(); });
+    $('limpiar-btn').addEventListener('click', () => { $('f-desde').value = ''; $('f-hasta').value = ''; movShown = PAGE_MOV; renderMovimientos(); });
+    $('mostrar-mas').addEventListener('click', () => { movShown += PAGE_MOV; renderMovimientos(); });
     $('exportar-btn').addEventListener('click', exportarCSV);
 
     async function cargarDatos() {
@@ -395,17 +401,26 @@
       $('cuentas-section').classList.add('hidden');
       $('movimientos-section').classList.remove('hidden');
 
-      const nombres = datos.accounts.filter((a) => cuentasAplicadas.has(a.id)).map((a) => a.nombre);
-      $('filtro-cuenta').innerHTML = `<span class="chip-cuenta" style="cursor:default;">Mostrando ${nombres.length} cuenta(s): ${nombres.join(', ')}</span>`;
-
       const txs = transaccionesTabla();
-      if (!txs.length) { $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos con los filtros elegidos.'; return; }
+      $('filtro-cuenta').innerHTML = `<span class="muted">${txs.length} movimiento(s) &middot; ${cuentasAplicadas.size} cuenta(s)</span>`;
+
+      if (!txs.length) { $('mas-wrap').classList.add('hidden'); $('tx-box').className = 'panel msg'; $('tx-box').textContent = 'No hay movimientos con los filtros elegidos.'; return; }
+
+      const visibles = txs.slice(0, movShown);
       let html = '<table><thead><tr><th>Fecha</th><th>Descripcion</th><th>Cuenta</th><th>Tipo</th><th class="num">Monto</th></tr></thead><tbody>';
-      txs.forEach((t) => {
+      visibles.forEach((t) => {
         html += `<tr><td>${t.fecha}</td><td>${t.descripcion}</td><td>${nombreCuenta(t.cuenta)}</td><td class="${t.tipo}">${t.tipo}</td><td class="num">${fmt(t.monto)}</td></tr>`;
       });
       html += '</tbody></table>';
       $('tx-box').className = 'panel'; $('tx-box').innerHTML = html;
+
+      // Paginado: boton "Mostrar mas" si quedan movimientos por ver.
+      if (txs.length > movShown) {
+        $('mas-wrap').classList.remove('hidden');
+        $('mostrar-mas').textContent = 'Mostrar mas (' + (txs.length - movShown) + ' restantes)';
+      } else {
+        $('mas-wrap').classList.add('hidden');
+      }
     }
 
     function exportarCSV() {
@@ -443,6 +458,7 @@
       if (!cuentasSeleccionadas.size) return;
       cuentasAplicadas = new Set(cuentasSeleccionadas);
       mostrarMov = true;
+      movShown = PAGE_MOV;
       renderMovimientos();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
