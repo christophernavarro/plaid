@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { PlaidApi, Configuration, PlaidEnvironments, Products, CountryCode } = require('plaid');
 
 const app = express();
@@ -20,17 +22,47 @@ const configuration = new Configuration({
 const plaidClient = new PlaidApi(configuration);
 
 // ==========================================================================
-// Estado en memoria (solo para el demo). En produccion: base de datos.
+// Estado persistido en archivo JSON. Se carga al iniciar y se guarda en cada
+// cambio relevante (registro, conexion de banco, sync de transacciones).
 // ==========================================================================
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'contador@bluemaxp.com').trim().toLowerCase();
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Contador';
 
-const usuarios = {};          // userId -> datos del usuario final
-const emailIndex = {};        // email (lower) -> userId
-const sesionesUsuario = {};   // token de sesion -> userId
-const sesionesAdmin = new Set(); // tokens de sesion del admin/contador
-const itemAusuario = {};      // plaid item_id -> userId (para webhooks)
+const DATA_FILE = path.join(__dirname, 'data.json');
+
+let usuarios = {};          // userId -> datos del usuario final
+let emailIndex = {};        // email (lower) -> userId
+const sesionesUsuario = {};   // token de sesion -> userId (no se persisten)
+const sesionesAdmin = new Set(); // tokens de sesion del admin/contador (no se persisten)
+let itemAusuario = {};      // plaid item_id -> userId (para webhooks)
+
+// --- Persistencia ---
+function guardarDatos() {
+  const state = { usuarios, emailIndex, itemAusuario };
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error guardando data.json:', err.message);
+  }
+}
+
+function cargarDatos() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      const state = JSON.parse(raw);
+      usuarios = state.usuarios || {};
+      emailIndex = state.emailIndex || {};
+      itemAusuario = state.itemAusuario || {};
+      console.log(`Datos cargados: ${Object.keys(usuarios).length} usuario(s)`);
+    }
+  } catch (err) {
+    console.error('Error cargando data.json (se inicia con estado vacio):', err.message);
+  }
+}
+
+cargarDatos();
 
 function nuevoId() {
   return crypto.randomBytes(12).toString('hex');
@@ -82,6 +114,7 @@ app.post('/api/registro', (req, res) => {
     conectado: false,
   };
   emailIndex[key] = id;
+  guardarDatos();
 
   const token = nuevoId();
   sesionesUsuario[token] = id;
@@ -145,6 +178,7 @@ app.post('/api/mi/exchange', requiereUsuario, async (req, res) => {
     u.accounts = [];
     u.conectado = true;
     itemAusuario[u.itemId] = u.id;
+    guardarDatos();
     res.json({ ok: true });
   } catch (err) {
     console.error(err.response ? err.response.data : err);
@@ -232,6 +266,7 @@ async function obtenerDatos(u) {
   await syncUsuario(u);
   const accountsResp = await plaidClient.accountsGet({ access_token: u.accessToken });
   u.accounts = accountsResp.data.accounts.map(formatAccount);
+  guardarDatos();
   const transactions = Object.values(u.transactions)
     .map(formatTransaction)
     .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
@@ -267,6 +302,7 @@ async function syncUsuario(u) {
       modified.forEach((t) => { u.transactions[t.transaction_id] = t; });
       removed.forEach((r) => { delete u.transactions[r.transaction_id]; });
       u.cursor = cursor;
+      guardarDatos();
       return;
     } catch (err) {
       const code = err.response && err.response.data && err.response.data.error_code;
