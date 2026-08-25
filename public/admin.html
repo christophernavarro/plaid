@@ -60,6 +60,7 @@
     .debito { color:var(--neg); } .credito { color:var(--pos); }
     .sectitle { font-family:'Newsreader',serif; font-size:20px; font-weight:600; margin:32px 0 0; }
     .head { display:flex; align-items:center; gap:14px; margin-top:14px; }
+    .detalle-head { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:16px; padding-bottom:22px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
     .filtros { margin-top:12px; gap:10px; }
     .filtros label { font-size:13px; color:var(--muted); }
 
@@ -134,15 +135,20 @@
     <!-- ================= DETALLE ================= -->
     <section id="screen-detalle" class="hidden">
       <button class="btn-link" id="volver-btn">&larr; Volver a usuarios</button>
-      <div class="head">
-        <span class="av dark" id="detalle-avatar" style="width:52px; height:52px; font-size:22px;"></span>
-        <div>
-          <h1 class="serif" id="detalle-nombre" style="font-size:30px; font-weight:500; margin:0; letter-spacing:-0.01em; text-transform:capitalize;"></h1>
-          <div class="muted" id="detalle-sub"></div>
+      <div class="detalle-head">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span class="av dark" id="detalle-avatar" style="width:52px; height:52px; font-size:22px;"></span>
+          <div>
+            <h1 class="serif" id="detalle-nombre" style="font-size:30px; font-weight:500; margin:0; letter-spacing:-0.01em; text-transform:capitalize;"></h1>
+            <div class="muted" id="detalle-sub" style="margin-top:2px;"></div>
+            <div id="detalle-estado" style="margin-top:8px;"></div>
+          </div>
         </div>
+        <button class="btn-ghost" id="refresh-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
+          Actualizar datos
+        </button>
       </div>
-      <div class="muted" id="detalle-estado" style="margin-top:8px;"></div>
-      <button class="btn-ghost" id="refresh-btn" style="margin-top:14px;">Actualizar datos</button>
 
       <div id="tiles" class="tiles hidden"></div>
 
@@ -303,7 +309,9 @@
       const data = await api('/api/admin/usuarios/' + usuarioActual + '/datos');
       if (data.error) { $('cuentas-box').className = 'panel msg'; $('cuentas-box').textContent = data.error; $('tx-box').textContent = ''; return; }
       datos = data;
-      $('detalle-estado').textContent = data.conectado ? 'Banco conectado.' : 'El usuario todavia no conecto su banco.';
+      $('detalle-estado').innerHTML = data.conectado
+        ? '<span class="badge ok">Banco conectado</span>'
+        : '<span class="badge pend">Sin banco conectado</span>';
 
       renderCuentas();
       renderMovimientos();
