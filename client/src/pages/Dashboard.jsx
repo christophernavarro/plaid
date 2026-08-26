@@ -597,6 +597,22 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
   );
 }
 
+function InsightIcon({ name }) {
+  const props = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: '#1f3a52', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  switch (name) {
+    case 'category':
+      return <svg {...props}><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>;
+    case 'trending-up':
+      return <svg {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+    case 'trending-down':
+      return <svg {...props}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>;
+    case 'repeat':
+      return <svg {...props}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>;
+    default:
+      return <svg {...props}><circle cx="12" cy="12" r="10"/></svg>;
+  }
+}
+
 function SpendingInsights({ txs, recurring }) {
   const debits = txs.filter(t => t.tipo === 'debito');
   if (!debits.length) return null;
@@ -621,9 +637,9 @@ function SpendingInsights({ txs, recurring }) {
   const biggest = outflows.sort((a, b) => (b.monto || 0) - (a.monto || 0))[0];
 
   const insights = [];
-  if (topCat) insights.push({ icon: '📊', text: `You spent most on ${getCategoryLabel(topCat[0]).toLowerCase()} this month`, detail: fmt(topCat[1]) });
-  if (lastMonthTotal > 0) insights.push({ icon: diff > 0 ? '📈' : '📉', text: diff > 0 ? `You're spending more than last month` : `You're spending less than last month`, detail: `${diff > 0 ? '+' : ''}${fmt(Math.abs(diff))}` });
-  if (biggest) insights.push({ icon: '🔄', text: `Your biggest subscription is ${biggest.descripcion}`, detail: fmt(biggest.monto) + '/mo' });
+  if (topCat) insights.push({ icon: 'category', text: `You spent most on ${getCategoryLabel(topCat[0]).toLowerCase()} this month`, detail: fmt(topCat[1]) });
+  if (lastMonthTotal > 0) insights.push({ icon: diff > 0 ? 'trending-up' : 'trending-down', text: diff > 0 ? `You're spending more than last month` : `You're spending less than last month`, detail: `${diff > 0 ? '+' : ''}${fmt(Math.abs(diff))}` });
+  if (biggest) insights.push({ icon: 'repeat', text: `Your biggest subscription is ${biggest.descripcion}`, detail: fmt(biggest.monto) + '/mo' });
 
   if (!insights.length) return null;
 
@@ -631,7 +647,9 @@ function SpendingInsights({ txs, recurring }) {
     <div className="grid sm:grid-cols-3 gap-3 mt-5">
       {insights.map((ins, i) => (
         <div key={i} className="bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm flex items-start gap-3">
-          <span className="text-xl">{ins.icon}</span>
+          <span className="w-9 h-9 rounded-[10px] bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <InsightIcon name={ins.icon} />
+          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-700 leading-snug">{ins.text}</p>
             <p className="font-mono text-sm font-semibold text-gray-900 mt-1">{ins.detail}</p>
