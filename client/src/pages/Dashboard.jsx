@@ -44,6 +44,8 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState('all'); // 'all', 'month', '3months', 'custom'
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  // Modal
+  const [modal, setModal] = useState(null); // null | 'balance' | 'income' | 'expenses' | 'accounts'
   const navigate = useNavigate();
   const nombre = localStorage.getItem('userName') || '';
 
@@ -183,13 +185,23 @@ export default function Dashboard() {
         </div>
       ) : (
         <div>
-          {/* Tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-            <Tile label="Total balance" value={fmt(balance)} />
-            <Tile label="Income" value={fmt(income)} className="text-pos" />
-            <Tile label="Expenses" value={fmt(expenses)} className="text-neg" />
-            <Tile label="Accounts" value={accounts.length} />
+          {/* Tiles - 2x2 clickable */}
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <Tile label="Total balance" value={fmt(balance)} onClick={() => setModal('balance')} />
+            <Tile label="Income" value={fmt(income)} className="text-pos" onClick={() => setModal('income')} />
+            <Tile label="Expenses" value={fmt(expenses)} className="text-neg" onClick={() => setModal('expenses')} />
+            <Tile label="Accounts" value={accounts.length} onClick={() => setModal('accounts')} />
           </div>
+
+          {/* Modal */}
+          {modal && (
+            <TileModal
+              type={modal}
+              accounts={accounts}
+              txs={txs}
+              onClose={() => setModal(null)}
+            />
+          )}
 
           {/* Navigation tabs */}
           <div className="flex gap-1 mt-7 border-b border-gray-200 overflow-x-auto">
@@ -363,12 +375,119 @@ export default function Dashboard() {
 
 // === Components ===
 
-function Tile({ label, value, className = '' }) {
+function Tile({ label, value, className = '', onClick }) {
   return (
-    <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-5 shadow-sm">
-      <div className="text-xs text-gray-400">{label}</div>
+    <div
+      onClick={onClick}
+      className={`bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-5 shadow-sm transition-all ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md' : ''}`}
+    >
+      <div className="flex justify-between items-start">
+        <div className="text-xs text-gray-400">{label}</div>
+        {onClick && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
+            <path d="M7 17L17 7M9 7h8v8"/>
+          </svg>
+        )}
+      </div>
       <div className={`font-mono text-2xl font-semibold mt-2 tracking-tight tabular-nums ${className}`}>
         {value}
+      </div>
+    </div>
+  );
+}
+
+function TileModal({ type, accounts, txs, onClose }) {
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('desc');
+
+  let title = '', eyebrow = '', items = [], mode = 'tx';
+
+  if (type === 'income') {
+    title = 'Income'; eyebrow = 'Credits'; mode = 'tx';
+    items = txs.filter(t => t.tipo === 'credito');
+  } else if (type === 'expenses') {
+    title = 'Expenses'; eyebrow = 'Debits'; mode = 'tx';
+    items = txs.filter(t => t.tipo === 'debito');
+  } else if (type === 'accounts' || type === 'balance') {
+    title = type === 'balance' ? 'Total balance' : 'Accounts';
+    eyebrow = 'Your accounts'; mode = 'acc';
+    items = accounts;
+  }
+
+  // Filter
+  let filtered = items;
+  if (search) {
+    const q = search.toLowerCase();
+    if (mode === 'tx') filtered = filtered.filter(t => (t.descripcion || '').toLowerCase().includes(q) || t.fecha.includes(q));
+    else filtered = filtered.filter(a => (a.nombre || '').toLowerCase().includes(q) || (a.tipo || '').toLowerCase().includes(q));
+  }
+  // Sort
+  if (mode === 'tx') filtered.sort((a, b) => sort === 'desc' ? b.monto - a.monto : a.monto - b.monto);
+  else filtered.sort((a, b) => sort === 'desc' ? (b.saldo || 0) - (a.saldo || 0) : (a.saldo || 0) - (b.saldo || 0));
+
+  const total = mode === 'tx'
+    ? filtered.reduce((s, t) => s + t.monto, 0)
+    : filtered.reduce((s, a) => s + (a.saldo || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-5" onClick={onClose}>
+      <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[560px] max-h-[82vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex justify-between items-start p-5 pb-3">
+          <div>
+            <div className="text-[11px] tracking-widest uppercase text-gray-400">{eyebrow}</div>
+            <h3 className="font-serif text-2xl font-semibold mt-1">{title}</h3>
+          </div>
+          <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-2 px-5 pb-3">
+          <div className="relative flex-1">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3 top-2.5">
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10"
+              placeholder="Search..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <select value={sort} onChange={e => setSort(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
+            <option value="desc">Highest first</option>
+            <option value="asc">Lowest first</option>
+          </select>
+        </div>
+
+        {/* Summary */}
+        <div className="px-5 pb-2 text-xs text-gray-400">
+          {filtered.length} {mode === 'tx' ? 'movements' : 'accounts'} &middot; {fmt(total)}
+        </div>
+
+        {/* List */}
+        <div className="overflow-y-auto px-5 pb-5">
+          {filtered.length === 0 && <p className="text-gray-400 text-sm py-4 text-center">No matches.</p>}
+          {mode === 'tx' ? filtered.map((t, i) => (
+            <div key={i} className="flex justify-between items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="text-sm">{t.descripcion}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.fecha}</div>
+              </div>
+              <div className={`font-mono text-sm font-medium whitespace-nowrap ${type === 'income' ? 'text-pos' : 'text-neg'}`}>
+                {type === 'income' ? '+' : '-'}{fmt(t.monto)}
+              </div>
+            </div>
+          )) : filtered.map((a, i) => (
+            <div key={i} className="flex justify-between items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="text-sm">{a.nombre}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{a.tipo}{a.mask ? ` ·••${a.mask}` : ''}</div>
+              </div>
+              <div className="font-mono text-sm font-medium whitespace-nowrap">{fmt(a.saldo)} {a.moneda || ''}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
