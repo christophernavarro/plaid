@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmt } from '../lib/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const MESES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -504,32 +505,27 @@ function MonthlyChart({ txs }) {
   const claves = Object.keys(meses).sort().slice(-6);
   if (!claves.length) return <p className="text-gray-400 text-sm mt-3">No data to chart yet.</p>;
 
-  const max = Math.max(...claves.flatMap(k => [meses[k].ing, meses[k].gas]), 1);
-  const W = 480, H = 200, padB = 30, padT = 10;
-  const anchoGrupo = W / claves.length;
-  const wBarra = Math.min(20, anchoGrupo / 3);
+  const data = claves.map(k => ({
+    name: MESES[parseInt(k.slice(5, 7), 10) - 1],
+    Income: Math.round(meses[k].ing * 100) / 100,
+    Expenses: Math.round(meses[k].gas * 100) / 100,
+  }));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-3">
-      <defs>
-        <linearGradient id="gpos" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3f8563"/><stop offset="1" stopColor="#2f6d4f"/></linearGradient>
-        <linearGradient id="gneg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c66c52"/><stop offset="1" stopColor="#b0553f"/></linearGradient>
-      </defs>
-      <line x1="0" y1={H - padB} x2={W} y2={H - padB} stroke="#e8e8ec" />
-      {claves.map((k, i) => {
-        const cx = i * anchoGrupo + anchoGrupo / 2;
-        const hIng = (meses[k].ing / max) * (H - padB - padT);
-        const hGas = (meses[k].gas / max) * (H - padB - padT);
-        const label = MESES[parseInt(k.slice(5, 7), 10) - 1];
-        return (
-          <g key={k}>
-            <rect x={cx - wBarra - 2} y={H - padB - hIng} width={wBarra} height={hIng} fill="url(#gpos)" rx="4" />
-            <rect x={cx + 2} y={H - padB - hGas} width={wBarra} height={hGas} fill="url(#gneg)" rx="4" />
-            <text x={cx} y={H - padB + 16} fontSize="11" fill="#8a8271" textAnchor="middle" fontFamily="Archivo, sans-serif">{label}</text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="mt-4" style={{ width: '100%', height: 200 }}>
+      <ResponsiveContainer>
+        <BarChart data={data} barGap={2} barCategoryGap="20%">
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7075', fontSize: 12 }} />
+          <YAxis hide />
+          <Tooltip
+            contentStyle={{ borderRadius: 10, border: '1px solid #e8e8ec', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 13 }}
+            formatter={(value) => ['$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })]}
+          />
+          <Bar dataKey="Income" fill="#2f6d4f" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="Expenses" fill="#b0553f" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -544,44 +540,55 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
 
   if (!entries.length) return <p className="text-gray-400 text-sm mt-3">No category data yet.</p>;
 
-  // Build SVG donut
-  const R = 70, cx = 90, cy = 90, stroke = 22;
-  const circumference = 2 * Math.PI * R;
-  let offset = 0;
+  const pieData = entries.slice(0, 8).map(([cat, val]) => ({
+    name: getCategoryLabel(cat),
+    value: val,
+    key: cat,
+    color: getCategoryColor(cat),
+  }));
 
   return (
-    <div className="flex items-center gap-5 mt-3">
-      <svg viewBox="0 0 180 180" className="w-[140px] h-[140px] flex-shrink-0">
-        {entries.slice(0, 8).map(([cat, val]) => {
-          const pct = val / total;
-          const dash = pct * circumference;
-          const gap = circumference - dash;
-          const isActive = activeCat === cat;
-          const segment = (
-            <circle
-              key={cat}
-              cx={cx} cy={cy} r={R}
-              fill="none"
-              stroke={getCategoryColor(cat)}
-              strokeWidth={isActive ? stroke + 6 : stroke}
-              strokeDasharray={`${dash} ${gap}`}
-              strokeDashoffset={-offset}
-              transform={`rotate(-90 ${cx} ${cy})`}
-              style={{ cursor: 'pointer', opacity: activeCat && !isActive ? 0.4 : 1, transition: 'opacity 0.2s, stroke-width 0.2s' }}
-              onClick={() => onCategoryClick && onCategoryClick(cat)}
+    <div className="flex items-center gap-4 mt-3">
+      <div className="w-[150px] h-[150px] flex-shrink-0">
+        <ResponsiveContainer>
+          <PieChart>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              innerRadius={45}
+              outerRadius={68}
+              paddingAngle={2}
+              dataKey="value"
+              onClick={(entry) => onCategoryClick && onCategoryClick(entry.key)}
+              style={{ cursor: 'pointer' }}
+            >
+              {pieData.map((entry) => (
+                <Cell
+                  key={entry.key}
+                  fill={entry.color}
+                  opacity={activeCat && activeCat !== entry.key ? 0.35 : 1}
+                  stroke={activeCat === entry.key ? entry.color : 'none'}
+                  strokeWidth={activeCat === entry.key ? 3 : 0}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{ borderRadius: 10, border: '1px solid #e8e8ec', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: 13 }}
+              formatter={(value) => ['$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })]}
             />
-          );
-          offset += dash;
-          return segment;
-        })}
-        <text x={cx} y={cy - 6} textAnchor="middle" fontSize="16" fontWeight="600" fill="#1a1a1c" fontFamily="IBM Plex Mono, monospace">{fmt(total)}</text>
-        <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#6b7075" fontFamily="Archivo, sans-serif">total spent</text>
-      </svg>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
       <div className="flex-1 space-y-1.5 overflow-hidden">
+        <div className="mb-2">
+          <div className="font-mono text-lg font-semibold">{fmt(total)}</div>
+          <div className="text-[10px] text-gray-400">total spent</div>
+        </div>
         {entries.slice(0, 6).map(([cat, val]) => (
           <div
             key={cat}
-            className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1 py-0.5 transition-colors ${activeCat === cat ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1.5 py-1 transition-colors ${activeCat === cat ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
             onClick={() => onCategoryClick && onCategoryClick(cat)}
           >
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: getCategoryColor(cat) }} />
