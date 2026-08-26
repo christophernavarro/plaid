@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 
@@ -9,6 +9,12 @@ export default function Login() {
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (localStorage.getItem('adminToken')) navigate('/admin', { replace: true });
+    else if (localStorage.getItem('userToken')) navigate('/dashboard', { replace: true });
+  }, [navigate]);
 
   async function handleLogin(e) {
     e.preventDefault();

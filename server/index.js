@@ -207,9 +207,11 @@ app.get('/api/mi/datos', requiereUsuario, async (req, res) => {
 app.get('/api/mi/recurring', requiereUsuario, async (req, res) => {
   try {
     if (!req.usuario.accessToken) return res.json({ recurring: [] });
+    const accountIds = (req.usuario.accounts || []).map(a => a.id);
+    if (!accountIds.length) return res.json({ recurring: [] });
     const response = await plaidClient.transactionsRecurringGet({
       access_token: req.usuario.accessToken,
-      account_ids: req.usuario.accounts.map(a => a.id),
+      account_ids: accountIds,
     });
     const format = (streams, tipo) => streams.map(s => ({
       id: s.stream_id,
@@ -399,9 +401,11 @@ app.get('/api/admin/usuarios/:id/recurring', requiereAdmin, async (req, res) => 
   if (!u) return res.status(404).json({ error: 'Usuario no existe' });
   try {
     if (!u.accessToken) return res.json({ recurring: [] });
+    const accountIds = (u.accounts || []).map(a => a.id);
+    if (!accountIds.length) return res.json({ recurring: [] });
     const response = await plaidClient.transactionsRecurringGet({
       access_token: u.accessToken,
-      account_ids: u.accounts.map(a => a.id),
+      account_ids: accountIds,
     });
     const format = (streams, tipo) => streams.map(s => ({
       id: s.stream_id,
@@ -635,6 +639,9 @@ function formatAccount(a) {
 
 // SPA fallback: any non-API route serves the React app
 app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
   const index = path.join(clientBuild, 'index.html');
   if (fs.existsSync(index)) {
     res.sendFile(index);
