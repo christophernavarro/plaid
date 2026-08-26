@@ -38,6 +38,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [connectStatus, setConnectStatus] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  // Filters
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('');
+  const [dateRange, setDateRange] = useState('all'); // 'all', 'month', '3months', 'custom'
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const navigate = useNavigate();
   const nombre = localStorage.getItem('userName') || '';
 
@@ -110,6 +116,28 @@ export default function Dashboard() {
   const income = txs.filter(t => t.tipo === 'credito').reduce((s, t) => s + t.monto, 0);
   const expenses = txs.filter(t => t.tipo === 'debito').reduce((s, t) => s + t.monto, 0);
   const balance = accounts.reduce((s, a) => s + (a.saldo || 0), 0);
+
+  // Filtered transactions
+  const filteredTxs = txs.filter(t => {
+    if (search && !(t.descripcion || '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (catFilter && t.categoria !== catFilter) return false;
+    if (dateRange === 'month') {
+      const now = new Date();
+      const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      if (t.fecha < start) return false;
+    } else if (dateRange === '3months') {
+      const d = new Date(); d.setMonth(d.getMonth() - 3);
+      const start = d.toISOString().slice(0, 10);
+      if (t.fecha < start) return false;
+    } else if (dateRange === 'custom') {
+      if (customFrom && t.fecha < customFrom) return false;
+      if (customTo && t.fecha > customTo) return false;
+    }
+    return true;
+  });
+
+  // Unique categories for filter
+  const categories = [...new Set(txs.map(t => t.categoria).filter(Boolean))].sort();
 
   return (
     <div className="max-w-[960px] mx-auto px-5 py-8 pb-16">
@@ -204,20 +232,76 @@ export default function Dashboard() {
                 {/* Category donut */}
                 <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm">
                   <span className="font-serif text-xl font-semibold">Spending by category</span>
-                  <CategoryDonut txs={txs} />
+                  <CategoryDonut txs={txs} onCategoryClick={(cat) => { setCatFilter(cat === catFilter ? '' : cat); }} activeCat={catFilter} />
                 </div>
               </div>
 
-              {/* Recent transactions with logos and badges */}
+              {/* Spending Insights */}
+              <SpendingInsights txs={txs} recurring={recurring} />
+
+              {/* Transactions with search + filters */}
               <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm mt-5">
-                <div className="flex justify-between items-baseline">
-                  <span className="font-serif text-xl font-semibold">Recent transactions</span>
+                <div className="flex justify-between items-baseline mb-4">
+                  <span className="font-serif text-xl font-semibold">Transactions</span>
                   <button onClick={cargar} className="text-xs text-brand-600 hover:underline">Refresh</button>
                 </div>
-                <div className="mt-4 space-y-0">
-                  {txs.slice(0, 12).map((t, i) => (
+
+                {/* Filters bar */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[180px]">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3 top-2.5">
+                      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+                    </svg>
+                    <input
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
+                      placeholder="Search transactions..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <select
+                    value={catFilter}
+                    onChange={e => setCatFilter(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400"
+                  >
+                    <option value="">All categories</option>
+                    {categories.map(c => (
+                      <option key={c} value={c}>{getCategoryLabel(c)}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={dateRange}
+                    onChange={e => setDateRange(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400"
+                  >
+                    <option value="all">All time</option>
+                    <option value="month">This month</option>
+                    <option value="3months">Last 3 months</option>
+                    <option value="custom">Custom range</option>
+                  </select>
+                  {(search || catFilter || dateRange !== 'all') && (
+                    <button
+                      onClick={() => { setSearch(''); setCatFilter(''); setDateRange('all'); setCustomFrom(''); setCustomTo(''); }}
+                      className="text-xs text-brand-600 hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+
+                {dateRange === 'custom' && (
+                  <div className="flex items-center gap-2 mb-4">
+                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400" />
+                    <span className="text-xs text-gray-400">to</span>
+                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400" />
+                  </div>
+                )}
+
+                <div className="text-xs text-gray-400 mb-2">{filteredTxs.length} transaction{filteredTxs.length !== 1 ? 's' : ''}</div>
+
+                <div className="space-y-0">
+                  {filteredTxs.slice(0, 20).map((t, i) => (
                     <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
-                      {/* Logo or fallback */}
                       <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {t.logo ? (
                           <img src={t.logo} alt="" className="w-full h-full object-cover rounded-full" />
@@ -249,8 +333,13 @@ export default function Dashboard() {
                       </span>
                     </div>
                   ))}
+                  {filteredTxs.length > 20 && (
+                    <p className="text-center text-xs text-gray-400 pt-3">Showing 20 of {filteredTxs.length}. Use filters to narrow results.</p>
+                  )}
+                  {filteredTxs.length === 0 && (
+                    <p className="text-center text-gray-400 text-sm py-6">No transactions match your filters.</p>
+                  )}
                 </div>
-                <p className="text-gray-400 text-xs mt-3">{txs.length} transactions total.</p>
               </div>
             </div>
           )}
@@ -325,7 +414,7 @@ function MonthlyChart({ txs }) {
   );
 }
 
-function CategoryDonut({ txs }) {
+function CategoryDonut({ txs, onCategoryClick, activeCat }) {
   const debits = txs.filter(t => t.tipo === 'debito' && t.categoria);
   const byCategory = {};
   debits.forEach(t => {
@@ -348,16 +437,19 @@ function CategoryDonut({ txs }) {
           const pct = val / total;
           const dash = pct * circumference;
           const gap = circumference - dash;
+          const isActive = activeCat === cat;
           const segment = (
             <circle
               key={cat}
               cx={cx} cy={cy} r={R}
               fill="none"
               stroke={getCategoryColor(cat)}
-              strokeWidth={stroke}
+              strokeWidth={isActive ? stroke + 6 : stroke}
               strokeDasharray={`${dash} ${gap}`}
               strokeDashoffset={-offset}
               transform={`rotate(-90 ${cx} ${cy})`}
+              style={{ cursor: 'pointer', opacity: activeCat && !isActive ? 0.4 : 1, transition: 'opacity 0.2s, stroke-width 0.2s' }}
+              onClick={() => onCategoryClick && onCategoryClick(cat)}
             />
           );
           offset += dash;
@@ -368,7 +460,11 @@ function CategoryDonut({ txs }) {
       </svg>
       <div className="flex-1 space-y-1.5 overflow-hidden">
         {entries.slice(0, 6).map(([cat, val]) => (
-          <div key={cat} className="flex items-center gap-2 text-xs">
+          <div
+            key={cat}
+            className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1 py-0.5 transition-colors ${activeCat === cat ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
+            onClick={() => onCategoryClick && onCategoryClick(cat)}
+          >
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: getCategoryColor(cat) }} />
             <span className="truncate text-gray-600">{getCategoryLabel(cat)}</span>
             <span className="ml-auto font-mono text-gray-500 whitespace-nowrap">{fmt(val)}</span>
@@ -378,6 +474,51 @@ function CategoryDonut({ txs }) {
           <div className="text-[10px] text-gray-400">+{entries.length - 6} more</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SpendingInsights({ txs, recurring }) {
+  const debits = txs.filter(t => t.tipo === 'debito');
+  if (!debits.length) return null;
+
+  // Top category this month
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthDebits = debits.filter(t => t.fecha.startsWith(thisMonth));
+  const byCat = {};
+  monthDebits.forEach(t => { if (t.categoria) byCat[t.categoria] = (byCat[t.categoria] || 0) + t.monto; });
+  const topCat = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+
+  // Last month comparison
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+  const lastMonthTotal = debits.filter(t => t.fecha.startsWith(lastMonthStr)).reduce((s, t) => s + t.monto, 0);
+  const thisMonthTotal = monthDebits.reduce((s, t) => s + t.monto, 0);
+  const diff = thisMonthTotal - lastMonthTotal;
+
+  // Biggest subscription
+  const outflows = recurring.filter(r => r.tipo === 'debito');
+  const biggest = outflows.sort((a, b) => (b.monto || 0) - (a.monto || 0))[0];
+
+  const insights = [];
+  if (topCat) insights.push({ icon: '📊', text: `You spent most on ${getCategoryLabel(topCat[0]).toLowerCase()} this month`, detail: fmt(topCat[1]) });
+  if (lastMonthTotal > 0) insights.push({ icon: diff > 0 ? '📈' : '📉', text: diff > 0 ? `You're spending more than last month` : `You're spending less than last month`, detail: `${diff > 0 ? '+' : ''}${fmt(Math.abs(diff))}` });
+  if (biggest) insights.push({ icon: '🔄', text: `Your biggest subscription is ${biggest.descripcion}`, detail: fmt(biggest.monto) + '/mo' });
+
+  if (!insights.length) return null;
+
+  return (
+    <div className="grid sm:grid-cols-3 gap-3 mt-5">
+      {insights.map((ins, i) => (
+        <div key={i} className="bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm flex items-start gap-3">
+          <span className="text-xl">{ins.icon}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-700 leading-snug">{ins.text}</p>
+            <p className="font-mono text-sm font-semibold text-gray-900 mt-1">{ins.detail}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

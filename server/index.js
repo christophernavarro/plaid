@@ -383,6 +383,69 @@ app.get('/api/admin/usuarios', requiereAdmin, (req, res) => {
   res.json({ usuarios: lista });
 });
 
+// Consolidated overview stats for all users
+app.get('/api/admin/resumen', requiereAdmin, (req, res) => {
+  const allUsers = Object.values(usuarios);
+  const totalClientes = allUsers.length;
+  const conectados = allUsers.filter(u => u.conectado).length;
+  const sinBanco = totalClientes - conectados;
+  let totalSaldo = 0;
+  let totalTransacciones = 0;
+  let totalDeudas = 0;
+  const alertas = [];
+
+  allUsers.forEach(u => {
+    u.accounts.forEach(a => { totalSaldo += a.saldo || 0; });
+    totalTransacciones += Object.keys(u.transactions).length;
+    // Check for stale accounts (no transactions in last 30 days)
+    const txDates = Object.values(u.transactions).map(t => t.date).sort();
+    const lastTx = txDates[txDates.length - 1];
+    if (u.conectado && lastTx) {
+      const daysSince = Math.floor((Date.now() - new Date(lastTx).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSince > 30) {
+        alertas.push({ tipo: 'inactivo', usuario: u.nombre, email: u.email, mensaje: `Sin movimientos hace ${daysSince} dias` });
+      }
+    }
+  });
+
+  res.json({
+    totalClientes,
+    conectados,
+    sinBanco,
+    totalSaldo,
+    totalTransacciones,
+    alertas,
+  });
+});
+
+// Global transaction search across all users
+app.get('/api/admin/buscar-transacciones', requiereAdmin, (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  if (!q || q.length < 2) return res.json({ resultados: [] });
+
+  const resultados = [];
+  Object.values(usuarios).forEach(u => {
+    Object.values(u.transactions).forEach(t => {
+      const desc = (t.merchant_name || t.name || '').toLowerCase();
+      if (desc.includes(q)) {
+        resultados.push({
+          usuario: u.nombre,
+          usuarioEmail: u.email,
+          usuarioId: u.id,
+          fecha: t.date,
+          descripcion: t.merchant_name || t.name,
+          monto: Math.abs(t.amount),
+          tipo: t.amount > 0 ? 'debito' : 'credito',
+          categoria: t.personal_finance_category ? t.personal_finance_category.primary : null,
+        });
+      }
+    });
+  });
+
+  resultados.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  res.json({ resultados: resultados.slice(0, 50) });
+});
+
 app.get('/api/admin/usuarios/:id/datos', requiereAdmin, async (req, res) => {
   const u = usuarios[req.params.id];
   if (!u) return res.status(404).json({ error: 'Usuario no existe' });

@@ -14,6 +14,11 @@ export default function Admin() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [activeTab, setActiveTab] = useState('movimientos');
+  // Consolidated overview
+  const [resumen, setResumen] = useState(null);
+  // Global search
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [globalResults, setGlobalResults] = useState([]);
   const navigate = useNavigate();
   const adminName = localStorage.getItem('adminName') || 'Contador';
 
@@ -33,6 +38,23 @@ export default function Admin() {
     const t = setTimeout(buscar, 250);
     return () => clearTimeout(t);
   }, [buscar]);
+
+  // Load consolidated overview
+  useEffect(() => {
+    api('/api/admin/resumen').then(data => {
+      if (!data.error) setResumen(data);
+    });
+  }, []);
+
+  // Global transaction search
+  useEffect(() => {
+    if (globalSearch.length < 2) { setGlobalResults([]); return; }
+    const t = setTimeout(async () => {
+      const data = await api(`/api/admin/buscar-transacciones?q=${encodeURIComponent(globalSearch)}`);
+      if (data.resultados) setGlobalResults(data.resultados);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [globalSearch]);
 
   async function verUsuario(u) {
     setSelected(u);
@@ -114,47 +136,124 @@ export default function Admin() {
           <h1 className="font-serif text-[38px] font-medium tracking-tight mt-1 capitalize">Hola, {adminName}</h1>
         </div>
 
-        <div className="relative mt-6">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
-            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-          </svg>
-          <input
-            className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
-            placeholder="Buscar usuario por nombre o email..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
+        {/* Consolidated Overview */}
+        {resumen && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+            <MiniTile label="Total clientes" value={resumen.totalClientes} />
+            <MiniTile label="Conectados" value={resumen.conectados} className="text-pos" />
+            <MiniTile label="Sin banco" value={resumen.sinBanco} className="text-amber-600" />
+            <MiniTile label="Saldo consolidado" value={fmt(resumen.totalSaldo)} />
+          </div>
+        )}
+
+        {/* Alerts */}
+        {resumen?.alertas?.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="text-xs tracking-wider uppercase text-gray-400">Alertas</div>
+            {resumen.alertas.map((a, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-[12px]">
+                <span className="text-lg">⚠️</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium capitalize">{a.usuario}</span>
+                  <span className="text-xs text-gray-500 ml-2">{a.email}</span>
+                </div>
+                <span className="text-xs text-amber-700 font-medium whitespace-nowrap">{a.mensaje}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Global transaction search */}
+        <div className="mt-6">
+          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Buscar transacciones en todos los usuarios</div>
+          <div className="relative">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input
+              className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
+              placeholder="Buscar por descripcion (ej: Netflix, Uber, Walmart)..."
+              value={globalSearch}
+              onChange={e => setGlobalSearch(e.target.value)}
+            />
+          </div>
+          {globalResults.length > 0 && (
+            <div className="mt-3 border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Usuario</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Fecha</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {globalResults.map((r, i) => (
+                    <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => verUsuario({ id: r.usuarioId, nombre: r.usuario, email: r.usuarioEmail })}>
+                      <td className="px-3 py-2.5 capitalize">{r.usuario}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{r.fecha}</td>
+                      <td className="px-3 py-2.5">{r.descripcion}</td>
+                      <td className={`px-3 py-2.5 ${r.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>{r.tipo}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{fmt(r.monto)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {globalResults.length >= 50 && (
+                <div className="text-center py-2 text-xs text-gray-400 border-t border-gray-100">Mostrando max 50 resultados</div>
+              )}
+            </div>
+          )}
+          {globalSearch.length >= 2 && globalResults.length === 0 && (
+            <p className="text-gray-400 text-sm mt-3">No se encontraron transacciones con "{globalSearch}".</p>
+          )}
         </div>
 
-        <div className="text-xs tracking-wider uppercase text-gray-400 mt-5">Tus clientes</div>
-        <div className="mt-2 space-y-3">
-          {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No hay usuarios que coincidan.</p>}
-          {usuarios.map(u => (
-            <div
-              key={u.id}
-              onClick={() => verUsuario(u)}
-              className="flex justify-between items-center gap-3 p-5 bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
-            >
-              <div className="flex items-center gap-3.5">
-                <span className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center font-semibold text-[15px] shadow-inner">
-                  {(u.nombre[0] || '?').toUpperCase()}
-                </span>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-semibold text-[15px] capitalize">{u.nombre}</span>
-                    {u.conectado
-                      ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Conectado</span>
-                      : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sin banco</span>
-                    }
+        {/* User list */}
+        <div className="mt-6">
+          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Tus clientes</div>
+          <div className="relative mb-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input
+              className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
+              placeholder="Buscar usuario por nombre o email..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="space-y-3">
+            {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No hay usuarios que coincidan.</p>}
+            {usuarios.map(u => (
+              <div
+                key={u.id}
+                onClick={() => verUsuario(u)}
+                className="flex justify-between items-center gap-3 p-5 bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center font-semibold text-[15px] shadow-inner">
+                    {(u.nombre[0] || '?').toUpperCase()}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-semibold text-[15px] capitalize">{u.nombre}</span>
+                      {u.conectado
+                        ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Conectado</span>
+                        : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sin banco</span>
+                      }
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} cuentas &middot; {u.cantidadTransacciones} movimientos</div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} cuentas &middot; {u.cantidadTransacciones} movimientos</div>
                 </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
+                  <path d="M9 6l6 6-6 6"/>
+                </svg>
               </div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
-                <path d="M9 6l6 6-6 6"/>
-              </svg>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     );
