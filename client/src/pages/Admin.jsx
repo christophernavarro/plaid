@@ -89,10 +89,11 @@ export default function Admin() {
 
   function filteredTxs() {
     if (!datos?.transactions) return [];
+    if (selectedAccounts.size === 0) return [];
     return datos.transactions.filter(t => {
       if (desde && t.fecha < desde) return false;
       if (hasta && t.fecha > hasta) return false;
-      if (selectedAccounts.size > 0 && !selectedAccounts.has(t.cuenta)) return false;
+      if (!selectedAccounts.has(t.cuenta)) return false;
       return true;
     });
   }
@@ -353,9 +354,13 @@ export default function Admin() {
                 </div>
               )}
               {selectedAccounts.size === 0 && datos?.accounts?.length > 0 && (
-                <div className="text-xs text-amber-600 mb-3 flex items-center gap-2">
-                  <span>Showing all transactions. Select accounts in the Accounts tab to filter.</span>
-                  <button onClick={() => setActiveTab('cuentas')} className="text-brand-600 hover:underline">Go to Accounts</button>
+                <div className="text-center py-12">
+                  <div className="text-3xl mb-3">🏦</div>
+                  <p className="text-gray-500 text-sm">No accounts selected.</p>
+                  <p className="text-gray-400 text-xs mt-1">Go to the Accounts tab and select at least one account to see transactions.</p>
+                  <button onClick={() => setActiveTab('cuentas')} className="mt-4 px-4 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md transition-all">
+                    Go to Accounts
+                  </button>
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3">
