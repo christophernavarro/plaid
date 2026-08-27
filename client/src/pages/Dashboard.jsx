@@ -330,11 +330,6 @@ export default function Dashboard() {
                           {t.pendiente && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold border border-amber-200">Pending</span>
                           )}
-                          {t.canal && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-brand-50">
-                              <ChannelIcon canal={t.canal} />
-                            </span>
-                          )}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5">
                           {t.fecha}
