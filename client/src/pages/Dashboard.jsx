@@ -985,7 +985,7 @@ function InvestmentsTab({ data }) {
             <div key={i} className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-[14px] shadow-sm">
               <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
                 <span className="text-xs font-bold text-brand-600">
-                  {h.security?.ticker ? h.security.ticker.slice(0, 3) : '📊'}
+                  {h.security?.ticker ? h.security.ticker.slice(0, 3) : (h.security?.nombre || '?')[0].toUpperCase()}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
