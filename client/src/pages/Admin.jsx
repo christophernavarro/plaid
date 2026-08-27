@@ -14,9 +14,11 @@ export default function Admin() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [adminTxVisible, setAdminTxVisible] = useState(50);
-  const [activeTab, setActiveTab] = useState('movimientos');
+  const [activeTab, setActiveTab] = useState('cuentas');
   // Tile modal
-  const [tileModal, setTileModal] = useState(null); // null | 'cuentas' | 'saldo' | 'movimientos' | 'debitos' | 'creditos'
+  const [tileModal, setTileModal] = useState(null);
+  // Selected accounts for filtering transactions
+  const [selectedAccounts, setSelectedAccounts] = useState(new Set()); // null | 'cuentas' | 'saldo' | 'movimientos' | 'debitos' | 'creditos'
   // Consolidated overview
   const [resumen, setResumen] = useState(null);
   // Global search
@@ -63,7 +65,8 @@ export default function Admin() {
     setSelected(u);
     setView('detail');
     setDesde(''); setHasta('');
-    setActiveTab('movimientos');
+    setActiveTab('cuentas');
+    setSelectedAccounts(new Set());
     setRecurring([]); setLiabilities(null); setInvestments(null);
     const data = await api(`/api/admin/usuarios/${u.id}/datos`);
     setDatos(data);
@@ -89,6 +92,7 @@ export default function Admin() {
     return datos.transactions.filter(t => {
       if (desde && t.fecha < desde) return false;
       if (hasta && t.fecha > hasta) return false;
+      if (selectedAccounts.size > 0 && !selectedAccounts.has(t.cuenta)) return false;
       return true;
     });
   }
@@ -319,8 +323,8 @@ export default function Admin() {
           {/* Tabs */}
           <div className="flex gap-1 mt-6 border-b border-gray-200 overflow-x-auto">
             {[
-              { key: 'movimientos', label: 'Transactions' },
               { key: 'cuentas', label: 'Accounts' },
+              { key: 'movimientos', label: 'Transactions' },
               { key: 'recurrentes', label: 'Recurring' },
               { key: 'deudas', label: 'Liabilities' },
               { key: 'inversiones', label: 'Investments' },
@@ -342,6 +346,18 @@ export default function Admin() {
           {/* TAB: Movimientos */}
           {activeTab === 'movimientos' && (
             <div className="mt-4">
+              {selectedAccounts.size > 0 && (
+                <div className="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                  <span>Showing transactions for {selectedAccounts.size} selected account{selectedAccounts.size !== 1 ? 's' : ''}</span>
+                  <button onClick={() => setActiveTab('cuentas')} className="text-brand-600 hover:underline">Edit selection</button>
+                </div>
+              )}
+              {selectedAccounts.size === 0 && datos?.accounts?.length > 0 && (
+                <div className="text-xs text-amber-600 mb-3 flex items-center gap-2">
+                  <span>Showing all transactions. Select accounts in the Accounts tab to filter.</span>
+                  <button onClick={() => setActiveTab('cuentas')} className="text-brand-600 hover:underline">Go to Accounts</button>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 <label className="text-xs text-gray-400">From
                   <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
@@ -421,28 +437,84 @@ export default function Admin() {
           {activeTab === 'cuentas' && (
             <div className="mt-4">
               {datos.accounts?.length ? (
-                <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Account</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">No.</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {datos.accounts.map(a => (
-                        <tr key={a.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">{a.nombre}</td>
-                          <td className="px-4 py-3">{a.tipo}</td>
-                          <td className="px-4 py-3">{a.mask}</td>
-                          <td className="px-4 py-3 text-right font-mono font-medium">{fmt(a.saldo)} {a.moneda}</td>
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs text-gray-400">
+                      {selectedAccounts.size === 0
+                        ? 'Select accounts to filter transactions'
+                        : `${selectedAccounts.size} of ${datos.accounts.length} accounts selected`}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedAccounts(new Set(datos.accounts.map(a => a.id)))}
+                        className="text-xs text-brand-600 hover:underline"
+                      >Select all</button>
+                      <button
+                        onClick={() => setSelectedAccounts(new Set())}
+                        className="text-xs text-gray-400 hover:underline"
+                      >Clear</button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="px-3 py-3 w-10">
+                            <input
+                              type="checkbox"
+                              checked={datos.accounts.length > 0 && selectedAccounts.size === datos.accounts.length}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedAccounts(new Set(datos.accounts.map(a => a.id)));
+                                else setSelectedAccounts(new Set());
+                              }}
+                              className="w-4 h-4 rounded accent-brand-600 cursor-pointer"
+                            />
+                          </th>
+                          <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Account</th>
+                          <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                          <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">No.</th>
+                          <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Balance</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {datos.accounts.map(a => (
+                          <tr
+                            key={a.id}
+                            className={`border-t border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${selectedAccounts.has(a.id) ? 'bg-brand-50/40' : ''}`}
+                            onClick={() => {
+                              setSelectedAccounts(prev => {
+                                const next = new Set(prev);
+                                if (next.has(a.id)) next.delete(a.id);
+                                else next.add(a.id);
+                                return next;
+                              });
+                            }}
+                          >
+                            <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedAccounts.has(a.id)}
+                                onChange={() => {
+                                  setSelectedAccounts(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(a.id)) next.delete(a.id);
+                                    else next.add(a.id);
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 rounded accent-brand-600 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-4 py-3">{a.nombre}</td>
+                            <td className="px-4 py-3">{a.tipo}</td>
+                            <td className="px-4 py-3">{a.mask}</td>
+                            <td className="px-4 py-3 text-right font-mono font-medium">{fmt(a.saldo)} {a.moneda}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               ) : (
                 <p className="text-gray-400 text-sm mt-3">No accounts yet.</p>
               )}
