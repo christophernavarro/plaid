@@ -616,8 +616,24 @@ async function obtenerDatos(u) {
   const accountsResp = await plaidClient.accountsGet({ access_token: u.accessToken });
   u.accounts = accountsResp.data.accounts.map(formatAccount);
   guardarDatos();
-  const transactions = Object.values(u.transactions)
-    .map(formatTransaction)
+
+  // Build a logo map from merchant names that have logos, then apply to all
+  const rawTxs = Object.values(u.transactions);
+  const logoMap = {};
+  rawTxs.forEach(t => {
+    const name = t.merchant_name || t.name;
+    if (t.logo_url && name) logoMap[name.toLowerCase()] = t.logo_url;
+  });
+
+  const transactions = rawTxs
+    .map(t => {
+      const formatted = formatTransaction(t);
+      // If this transaction has no logo but another with same merchant does, use it
+      if (!formatted.logo && formatted.descripcion) {
+        formatted.logo = logoMap[formatted.descripcion.toLowerCase()] || null;
+      }
+      return formatted;
+    })
     .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
   return { conectado: true, accounts: u.accounts, transactions };
 }
