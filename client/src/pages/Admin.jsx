@@ -14,6 +14,8 @@ export default function Admin() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [activeTab, setActiveTab] = useState('movimientos');
+  // Tile modal
+  const [tileModal, setTileModal] = useState(null); // null | 'cuentas' | 'saldo' | 'movimientos' | 'debitos' | 'creditos'
   // Consolidated overview
   const [resumen, setResumen] = useState(null);
   // Global search
@@ -301,12 +303,17 @@ export default function Admin() {
         <>
           {/* Summary tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-            <MiniTile label="Cuentas" value={datos.accounts?.length || 0} />
-            <MiniTile label="Saldo total" value={fmt(saldoTotal)} />
-            <MiniTile label="Movimientos" value={txs.length} />
-            <MiniTile label="Debitos" value={fmt(totalDeb)} className="text-neg" />
-            <MiniTile label="Creditos" value={fmt(totalCred)} className="text-pos" />
+            <MiniTile label="Cuentas" value={datos.accounts?.length || 0} onClick={() => setTileModal('cuentas')} />
+            <MiniTile label="Saldo total" value={fmt(saldoTotal)} onClick={() => setTileModal('saldo')} />
+            <MiniTile label="Movimientos" value={txs.length} onClick={() => setTileModal('movimientos')} />
+            <MiniTile label="Debitos" value={fmt(totalDeb)} className="text-neg" onClick={() => setTileModal('debitos')} />
+            <MiniTile label="Creditos" value={fmt(totalCred)} className="text-pos" onClick={() => setTileModal('creditos')} />
           </div>
+
+          {/* Tile Modal */}
+          {tileModal && (
+            <AdminTileModal type={tileModal} datos={datos} txs={txs} onClose={() => setTileModal(null)} />
+          )}
 
           {/* Tabs */}
           <div className="flex gap-1 mt-6 border-b border-gray-200 overflow-x-auto">
@@ -505,11 +512,113 @@ function formatFreq(freq) {
   return map[freq] || freq || '-';
 }
 
-function MiniTile({ label, value, className = '' }) {
+function MiniTile({ label, value, className = '', onClick }) {
   return (
-    <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] p-4 shadow-sm">
-      <div className="text-[11px] text-gray-400">{label}</div>
+    <div
+      onClick={onClick}
+      className={`bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] p-4 shadow-sm transition-all ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md' : ''}`}
+    >
+      <div className="flex justify-between items-start">
+        <div className="text-[11px] text-gray-400">{label}</div>
+        {onClick && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        )}
+      </div>
       <div className={`font-mono text-lg font-semibold mt-1.5 tracking-tight tabular-nums ${className}`}>{value}</div>
+    </div>
+  );
+}
+
+function AdminTileModal({ type, datos, txs, onClose }) {
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('desc');
+
+  let title = '', items = [], mode = 'tx';
+
+  if (type === 'cuentas' || type === 'saldo') {
+    title = type === 'saldo' ? 'Saldo total' : 'Cuentas';
+    mode = 'acc';
+    items = datos?.accounts || [];
+  } else if (type === 'debitos') {
+    title = 'Debitos';
+    mode = 'tx';
+    items = txs.filter(t => t.tipo === 'debito');
+  } else if (type === 'creditos') {
+    title = 'Creditos';
+    mode = 'tx';
+    items = txs.filter(t => t.tipo === 'credito');
+  } else {
+    title = 'Movimientos';
+    mode = 'tx';
+    items = txs;
+  }
+
+  let filtered = items;
+  if (search) {
+    const q = search.toLowerCase();
+    if (mode === 'tx') filtered = filtered.filter(t => (t.descripcion || '').toLowerCase().includes(q) || t.fecha.includes(q));
+    else filtered = filtered.filter(a => (a.nombre || '').toLowerCase().includes(q));
+  }
+  if (mode === 'tx') filtered = [...filtered].sort((a, b) => sort === 'desc' ? b.monto - a.monto : a.monto - b.monto);
+  else filtered = [...filtered].sort((a, b) => sort === 'desc' ? (b.saldo || 0) - (a.saldo || 0) : (a.saldo || 0) - (b.saldo || 0));
+
+  const total = mode === 'tx'
+    ? filtered.reduce((s, t) => s + t.monto, 0)
+    : filtered.reduce((s, a) => s + (a.saldo || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-5" onClick={onClose}>
+      <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[560px] max-h-[82vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-start p-5 pb-3">
+          <div>
+            <div className="text-[11px] tracking-widest uppercase text-gray-400">{mode === 'tx' ? 'Transacciones' : 'Cuentas'}</div>
+            <h3 className="font-serif text-2xl font-semibold mt-1">{title}</h3>
+          </div>
+          <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
+        </div>
+        <div className="flex gap-2 px-5 pb-3">
+          <div className="relative flex-1">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3 top-2.5">
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10"
+              placeholder="Buscar..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <select value={sort} onChange={e => setSort(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
+            <option value="desc">Mayor a menor</option>
+            <option value="asc">Menor a mayor</option>
+          </select>
+        </div>
+        <div className="px-5 pb-2 text-xs text-gray-400">
+          {filtered.length} {mode === 'tx' ? 'movimientos' : 'cuentas'} &middot; {fmt(total)}
+        </div>
+        <div className="overflow-y-auto px-5 pb-5">
+          {filtered.length === 0 && <p className="text-gray-400 text-sm py-4 text-center">Sin resultados.</p>}
+          {mode === 'tx' ? filtered.map((t, i) => (
+            <div key={i} className="flex justify-between items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="text-sm">{t.descripcion}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{t.fecha}{t.categoria && <> &middot; {formatCategory(t.categoria)}</>}</div>
+              </div>
+              <div className={`font-mono text-sm font-medium whitespace-nowrap ${t.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>
+                {t.tipo === 'credito' ? '+' : '-'}{fmt(t.monto)}
+              </div>
+            </div>
+          )) : filtered.map((a, i) => (
+            <div key={i} className="flex justify-between items-center gap-3 py-3 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="text-sm">{a.nombre}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{a.tipo}{a.mask ? ` ·••${a.mask}` : ''}</div>
+              </div>
+              <div className="font-mono text-sm font-medium whitespace-nowrap">{fmt(a.saldo)} {a.moneda || ''}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
