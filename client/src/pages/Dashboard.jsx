@@ -717,7 +717,7 @@ function SpendingInsights({ txs, recurring }) {
   return (
     <div className="grid sm:grid-cols-3 gap-3 mt-5">
       {insights.map((ins, i) => (
-        <div key={i} className="bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm flex items-start gap-3">
+        <div key={i} className="bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm flex items-start gap-3 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300">
           <span className="w-9 h-9 rounded-[10px] bg-brand-50 flex items-center justify-center flex-shrink-0">
             <InsightIcon name={ins.icon} />
           </span>
