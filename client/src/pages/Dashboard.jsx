@@ -331,8 +331,8 @@ export default function Dashboard() {
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold border border-amber-200">Pending</span>
                           )}
                           {t.canal && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-200">
-                              {t.canal === 'in store' ? '🏪' : t.canal === 'online' ? '🌐' : '💳'}
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-brand-50">
+                              <ChannelIcon canal={t.canal} />
                             </span>
                           )}
                         </div>
@@ -602,6 +602,20 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
       </div>
     </div>
   );
+}
+
+function ChannelIcon({ canal }) {
+  const props = { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: '#1f3a52', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  if (canal === 'in store') {
+    // Store/shop icon
+    return <svg {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+  }
+  if (canal === 'online') {
+    // Globe icon
+    return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
+  }
+  // Card/other
+  return <svg {...props}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
 }
 
 function InsightIcon({ name }) {
