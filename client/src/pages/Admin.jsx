@@ -134,7 +134,7 @@ export default function Admin() {
             </span>
             <span className="text-xs text-brand-600 bg-brand-50 rounded-full px-2.5 py-0.5 font-semibold self-center ml-1">Accountant</span>
           </div>
-          <button onClick={logout} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md transition-all">
+          <button onClick={logout} className="flex items-center gap-1.5 px-4 py-2.5 border border-red-200 bg-red-50 rounded-[10px] text-sm font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-all">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
             Logout
           </button>
