@@ -21,6 +21,7 @@ export default function Admin() {
   const [selectedAccounts, setSelectedAccounts] = useState(new Set()); // null | 'cuentas' | 'saldo' | 'movimientos' | 'debitos' | 'creditos'
   // Consolidated overview
   const [resumen, setResumen] = useState(null);
+  const [overviewModal, setOverviewModal] = useState(null); // null | 'all' | 'connected' | 'nobank'
   // Global search
   const [globalSearch, setGlobalSearch] = useState('');
   const [globalResults, setGlobalResults] = useState([]);
@@ -146,11 +147,57 @@ export default function Admin() {
 
         {/* Consolidated Overview */}
         {resumen && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-            <MiniTile label="Total clients" value={resumen.totalClientes} />
-            <MiniTile label="Connected" value={resumen.conectados} className="text-pos" />
-            <MiniTile label="No bank" value={resumen.sinBanco} className="text-amber-600" />
-            <MiniTile label="Total balance" value={fmt(resumen.totalSaldo)} />
+          <div className="grid grid-cols-3 gap-3 mt-6">
+            <MiniTile label="Total clients" value={resumen.totalClientes} onClick={() => setOverviewModal('all')} />
+            <MiniTile label="Connected" value={resumen.conectados} className="text-pos" onClick={() => setOverviewModal('connected')} />
+            <MiniTile label="No bank" value={resumen.sinBanco} className="text-amber-600" onClick={() => setOverviewModal('nobank')} />
+          </div>
+        )}
+
+        {/* Overview Modal */}
+        {overviewModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-5" onClick={() => setOverviewModal(null)}>
+            <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[500px] max-h-[75vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start p-5 pb-3">
+                <div>
+                  <div className="text-[11px] tracking-widest uppercase text-gray-400">Clients</div>
+                  <h3 className="font-serif text-2xl font-semibold mt-1">
+                    {overviewModal === 'all' && 'All clients'}
+                    {overviewModal === 'connected' && 'Connected clients'}
+                    {overviewModal === 'nobank' && 'Clients without bank'}
+                  </h3>
+                </div>
+                <button onClick={() => setOverviewModal(null)} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
+              </div>
+              <div className="overflow-y-auto px-5 pb-5">
+                {usuarios
+                  .filter(u => {
+                    if (overviewModal === 'connected') return u.conectado;
+                    if (overviewModal === 'nobank') return !u.conectado;
+                    return true;
+                  })
+                  .map(u => (
+                    <div
+                      key={u.id}
+                      onClick={() => { setOverviewModal(null); verUsuario(u); }}
+                      className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-2 transition-colors"
+                    >
+                      <span className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center font-semibold text-xs">
+                        {(u.nombre[0] || '?').toUpperCase()}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium capitalize truncate">{u.nombre}</div>
+                        <div className="text-[11px] text-gray-400">{u.email}</div>
+                      </div>
+                      {u.conectado
+                        ? <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Connected</span>
+                        : <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">No bank</span>
+                      }
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
           </div>
         )}
 

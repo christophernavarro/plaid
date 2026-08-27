@@ -445,7 +445,7 @@ app.get('/api/admin/resumen', requiereAdmin, (req, res) => {
     totalSaldo,
     totalTransacciones,
     alertas,
-    recentActivity: recentActivity.slice(0, 10),
+    recentActivity: recentActivity.slice(0, 5),
     topSpenders: topSpenders.slice(0, 5),
   });
 });
