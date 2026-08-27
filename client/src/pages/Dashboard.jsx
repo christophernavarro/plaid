@@ -158,7 +158,7 @@ export default function Dashboard() {
             Bluema<span className="text-brand-600">x</span>p
           </span>
         </div>
-        <button onClick={logout} className="flex items-center gap-1.5 px-4 py-2.5 border border-red-200 bg-red-50 rounded-[11px] text-sm font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-all">
+        <button onClick={logout} className="flex items-center gap-1.5 px-4 py-2.5 border border-brand-200 bg-brand-50 rounded-[11px] text-sm font-medium text-brand-600 hover:bg-brand-100 hover:border-brand-300 transition-all">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
           Log out
         </button>
