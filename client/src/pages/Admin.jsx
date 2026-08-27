@@ -218,6 +218,51 @@ export default function Admin() {
           </div>
         )}
 
+        {/* User list */}
+        <div className="mt-6">
+          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Your clients</div>
+          <div className="relative mb-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input
+              className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
+              placeholder="Search user by name or email..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="space-y-3">
+            {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No users match.</p>}
+            {usuarios.map(u => (
+              <div
+                key={u.id}
+                onClick={() => verUsuario(u)}
+                className="flex justify-between items-center gap-3 p-5 bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center font-semibold text-[15px] shadow-inner">
+                    {(u.nombre[0] || '?').toUpperCase()}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-semibold text-[15px] capitalize">{u.nombre}</span>
+                      {u.conectado
+                        ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Connected</span>
+                        : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">No bank</span>
+                      }
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} accounts &middot; {u.cantidadTransacciones} transactions</div>
+                  </div>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
+                  <path d="M9 6l6 6-6 6"/>
+                </svg>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Recent activity + Top spenders */}
         {resumen && (resumen.recentActivity?.length > 0 || resumen.topSpenders?.length > 0) && (
           <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5 mt-6">
@@ -322,50 +367,6 @@ export default function Admin() {
           )}
         </div>
 
-        {/* User list */}
-        <div className="mt-6">
-          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Your clients</div>
-          <div className="relative mb-3">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
-              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-            </svg>
-            <input
-              className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
-              placeholder="Search user by name or email..."
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="space-y-3">
-            {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No users match.</p>}
-            {usuarios.map(u => (
-              <div
-                key={u.id}
-                onClick={() => verUsuario(u)}
-                className="flex justify-between items-center gap-3 p-5 bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[14px] shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-3.5">
-                  <span className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center font-semibold text-[15px] shadow-inner">
-                    {(u.nombre[0] || '?').toUpperCase()}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-semibold text-[15px] capitalize">{u.nombre}</span>
-                      {u.conectado
-                        ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Connected</span>
-                        : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">No bank</span>
-                      }
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} accounts &middot; {u.cantidadTransacciones} transactions</div>
-                  </div>
-                </div>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
-                  <path d="M9 6l6 6-6 6"/>
-                </svg>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     );
   }
