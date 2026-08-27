@@ -805,8 +805,10 @@ function RecurringCard({ item }) {
 
   return (
     <div className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-[14px] shadow-sm">
-      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-        <span className="text-sm">🔄</span>
+      <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-semibold text-brand-600">
+          {(item.descripcion || '?')[0].toUpperCase()}
+        </span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
