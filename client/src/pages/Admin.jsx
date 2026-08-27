@@ -13,6 +13,7 @@ export default function Admin() {
   const [investments, setInvestments] = useState(null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [adminTxVisible, setAdminTxVisible] = useState(50);
   const [activeTab, setActiveTab] = useState('movimientos');
   // Tile modal
   const [tileModal, setTileModal] = useState(null); // null | 'cuentas' | 'saldo' | 'movimientos' | 'debitos' | 'creditos'
@@ -348,7 +349,7 @@ export default function Admin() {
                 <label className="text-xs text-gray-400">Hasta
                   <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
                 </label>
-                <button onClick={() => { setDesde(''); setHasta(''); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Limpiar</button>
+                <button onClick={() => { setDesde(''); setHasta(''); setAdminTxVisible(50); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Limpiar</button>
                 <button onClick={exportCSV} className="ml-auto flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-sm rounded-[11px] shadow-lg shadow-brand-600/25 hover:brightness-110 hover:-translate-y-0.5 transition-all">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
                   Exportar CSV
@@ -371,7 +372,7 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {txs.slice(0, 100).map((t, i) => (
+                      {txs.slice(0, adminTxVisible).map((t, i) => (
                         <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                           <td className="px-3 py-2.5 whitespace-nowrap">{t.fecha}</td>
                           <td className="px-3 py-2.5">
@@ -399,9 +400,14 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
-                  {txs.length > 100 && (
-                    <div className="text-center py-3 text-xs text-gray-400 border-t border-gray-100">
-                      Mostrando 100 de {txs.length}. Exporta a CSV para ver todos.
+                  {txs.length > adminTxVisible && (
+                    <div className="text-center py-4 border-t border-gray-100">
+                      <button
+                        onClick={() => setAdminTxVisible(v => v + 50)}
+                        className="px-5 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 transition-all"
+                      >
+                        Mostrar mas ({txs.length - adminTxVisible} restantes)
+                      </button>
                     </div>
                   )}
                 </div>
