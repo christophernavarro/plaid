@@ -171,6 +171,62 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Recent activity + Top spenders */}
+        {resumen && (resumen.recentActivity?.length > 0 || resumen.topSpenders?.length > 0) && (
+          <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5 mt-6">
+            {/* Recent activity */}
+            {resumen.recentActivity?.length > 0 && (
+              <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[16px] p-5 shadow-sm">
+                <div className="text-xs tracking-wider uppercase text-gray-400 mb-3">Recent activity</div>
+                <div className="space-y-0">
+                  {resumen.recentActivity.map((tx, i) => (
+                    <div key={i} className="flex items-center gap-3 py-2.5 border-b border-gray-100 last:border-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {tx.logo ? (
+                          <img src={tx.logo} alt="" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <span className="text-[10px] font-semibold text-gray-400">{(tx.descripcion || '?')[0].toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{tx.descripcion}</div>
+                        <div className="text-[11px] text-gray-400">{tx.usuario} &middot; {tx.fecha}</div>
+                      </div>
+                      <span className={`font-mono text-xs font-medium whitespace-nowrap ${tx.tipo === 'credito' ? 'text-pos' : 'text-neg'}`}>
+                        {tx.tipo === 'credito' ? '+' : '-'}{fmt(tx.monto)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top spenders */}
+            {resumen.topSpenders?.length > 0 && (
+              <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[16px] p-5 shadow-sm">
+                <div className="text-xs tracking-wider uppercase text-gray-400 mb-3">Top clients by expenses</div>
+                <div className="space-y-0">
+                  {resumen.topSpenders.map((u, i) => (
+                    <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded transition-colors" onClick={() => verUsuario({ id: u.id, nombre: u.nombre, email: u.email })}>
+                      <span className="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium capitalize truncate">{u.nombre}</div>
+                        <div className="text-[11px] text-gray-400">{u.cuentas} accounts</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-xs font-medium text-neg">{fmt(u.gastos)}</div>
+                        <div className="font-mono text-[10px] text-pos">+{fmt(u.ingresos)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Global transaction search */}
         <div className="mt-6">
           <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Search transactions across all users</div>

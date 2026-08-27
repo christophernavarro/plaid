@@ -408,6 +408,36 @@ app.get('/api/admin/resumen', requiereAdmin, (req, res) => {
     }
   });
 
+  // Recent activity: last 10 transactions across all users
+  const recentActivity = [];
+  allUsers.forEach(u => {
+    Object.values(u.transactions).forEach(t => {
+      recentActivity.push({
+        usuario: u.nombre,
+        fecha: t.date,
+        descripcion: t.merchant_name || t.name,
+        monto: Math.abs(t.amount),
+        tipo: t.amount > 0 ? 'debito' : 'credito',
+        logo: t.logo_url || null,
+      });
+    });
+  });
+  recentActivity.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+
+  // Top spenders: users ranked by total expenses
+  const topSpenders = allUsers
+    .filter(u => u.conectado)
+    .map(u => {
+      const totalGastos = Object.values(u.transactions)
+        .filter(t => t.amount > 0)
+        .reduce((s, t) => s + t.amount, 0);
+      const totalIngresos = Object.values(u.transactions)
+        .filter(t => t.amount < 0)
+        .reduce((s, t) => s + Math.abs(t.amount), 0);
+      return { nombre: u.nombre, email: u.email, id: u.id, gastos: totalGastos, ingresos: totalIngresos, cuentas: u.accounts.length };
+    })
+    .sort((a, b) => b.gastos - a.gastos);
+
   res.json({
     totalClientes,
     conectados,
@@ -415,6 +445,8 @@ app.get('/api/admin/resumen', requiereAdmin, (req, res) => {
     totalSaldo,
     totalTransacciones,
     alertas,
+    recentActivity: recentActivity.slice(0, 10),
+    topSpenders: topSpenders.slice(0, 5),
   });
 });
 
