@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [customTo, setCustomTo] = useState('');
   // Modal
   const [modal, setModal] = useState(null); // null | 'balance' | 'income' | 'expenses' | 'accounts'
+  const [chartModal, setChartModal] = useState(null); // null | 'monthly' | 'category'
   const navigate = useNavigate();
   const nombre = localStorage.getItem('userName') || '';
 
@@ -230,10 +231,13 @@ export default function Dashboard() {
             <div className="mt-5">
               <div className="grid lg:grid-cols-[1fr_1fr] gap-5">
                 {/* Monthly chart */}
-                <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm">
+                <div
+                  className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
+                  onClick={() => setChartModal('monthly')}
+                >
                   <div className="flex justify-between items-baseline">
                     <span className="font-serif text-xl font-semibold">Income vs Expenses</span>
-                    <span className="text-xs text-gray-400">Last 6 months</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="flex-shrink-0"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
                   </div>
                   <MonthlyChart txs={txs} />
                   <div className="flex gap-5 text-xs text-gray-400 mt-1.5">
@@ -243,11 +247,22 @@ export default function Dashboard() {
                 </div>
 
                 {/* Category donut */}
-                <div className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm">
-                  <span className="font-serif text-xl font-semibold">Spending by category</span>
+                <div
+                  className="bg-gradient-to-b from-white to-gray-50 border border-gray-200 rounded-[18px] p-6 shadow-sm cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all"
+                  onClick={() => setChartModal('category')}
+                >
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-serif text-xl font-semibold">Spending by category</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="flex-shrink-0"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                  </div>
                   <CategoryDonut txs={txs} onCategoryClick={(cat) => { setCatFilter(cat === catFilter ? '' : cat); }} activeCat={catFilter} />
                 </div>
               </div>
+
+              {/* Chart Modal */}
+              {chartModal && (
+                <ChartModal type={chartModal} txs={txs} catFilter={catFilter} setCatFilter={setCatFilter} onClose={() => setChartModal(null)} />
+              )}
 
               {/* Spending Insights */}
               <SpendingInsights txs={txs} recurring={recurring} />
@@ -392,6 +407,46 @@ function Tile({ label, value, className = '', onClick }) {
   );
 }
 
+function ChartModal({ type, txs, catFilter, setCatFilter, onClose }) {
+  if (type === 'monthly') {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-5" onClick={onClose}>
+        <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[750px] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="flex justify-between items-center p-6 pb-2">
+            <div>
+              <h3 className="font-serif text-2xl font-semibold">Income vs Expenses</h3>
+              <p className="text-xs text-gray-400 mt-1">Last 6 months</p>
+            </div>
+            <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
+          </div>
+          <div className="px-6 pb-6" style={{ height: 360 }}>
+            <MonthlyChart txs={txs} height={320} />
+          </div>
+          <div className="flex gap-5 text-xs text-gray-400 px-6 pb-5">
+            <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-pos mr-1.5 align-middle" />Income</span>
+            <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-neg mr-1.5 align-middle" />Expenses</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Category
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-5" onClick={onClose}>
+      <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[700px] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center p-6 pb-2">
+          <h3 className="font-serif text-2xl font-semibold">Spending by category</h3>
+          <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
+        </div>
+        <div className="px-6 pb-6">
+          <CategoryDonut txs={txs} onCategoryClick={(cat) => setCatFilter(cat === catFilter ? '' : cat)} activeCat={catFilter} large />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TileModal({ type, accounts, txs, onClose }) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('desc');
@@ -489,7 +544,7 @@ function TileModal({ type, accounts, txs, onClose }) {
   );
 }
 
-function MonthlyChart({ txs }) {
+function MonthlyChart({ txs, height = 200 }) {
   const meses = {};
   txs.forEach(t => {
     const m = t.fecha.slice(0, 7);
@@ -507,7 +562,7 @@ function MonthlyChart({ txs }) {
   }));
 
   return (
-    <div className="mt-4" style={{ width: '100%', height: 200 }}>
+    <div className="mt-4" style={{ width: '100%', height }}>
       <ResponsiveContainer>
         <BarChart data={data} barGap={2} barCategoryGap="20%">
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7075', fontSize: 12 }} />
@@ -524,7 +579,7 @@ function MonthlyChart({ txs }) {
   );
 }
 
-function CategoryDonut({ txs, onCategoryClick, activeCat }) {
+function CategoryDonut({ txs, onCategoryClick, activeCat, large }) {
   const debits = txs.filter(t => t.tipo === 'debito' && t.categoria);
   const byCategory = {};
   debits.forEach(t => {
@@ -543,16 +598,16 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
   }));
 
   return (
-    <div className="flex items-center gap-4 mt-3">
-      <div className="w-[150px] h-[150px] flex-shrink-0">
+    <div className={`flex items-center gap-5 mt-3 ${large ? 'flex-col sm:flex-row' : ''}`}>
+      <div className={`flex-shrink-0 ${large ? 'w-[260px] h-[260px]' : 'w-[150px] h-[150px]'}`}>
         <ResponsiveContainer>
           <PieChart>
             <Pie
               data={pieData}
               cx="50%"
               cy="50%"
-              innerRadius={45}
-              outerRadius={68}
+              innerRadius={large ? 75 : 45}
+              outerRadius={large ? 115 : 68}
               paddingAngle={2}
               dataKey="value"
               onClick={(entry) => onCategoryClick && onCategoryClick(entry.key)}
@@ -580,7 +635,7 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
           <div className="font-mono text-lg font-semibold">{fmt(total)}</div>
           <div className="text-[10px] text-gray-400">total spent</div>
         </div>
-        {entries.slice(0, 6).map(([cat, val]) => (
+        {(large ? entries : entries.slice(0, 6)).map(([cat, val]) => (
           <div
             key={cat}
             className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1.5 py-1 transition-colors ${activeCat === cat ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
@@ -591,7 +646,7 @@ function CategoryDonut({ txs, onCategoryClick, activeCat }) {
             <span className="ml-auto font-mono text-gray-500 whitespace-nowrap">{fmt(val)}</span>
           </div>
         ))}
-        {entries.length > 6 && (
+        {!large && entries.length > 6 && (
           <div className="text-[10px] text-gray-400">+{entries.length - 6} more</div>
         )}
       </div>
