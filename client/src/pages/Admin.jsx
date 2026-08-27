@@ -381,10 +381,10 @@ export default function Admin() {
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-xs text-gray-500">{formatCategory(t.categoria)}</td>
-                          <td className="px-3 py-2.5 text-xs">
-                            {t.canal === 'in store' && <span title="En tienda">🏪</span>}
-                            {t.canal === 'online' && <span title="Online">🌐</span>}
-                            {t.canal === 'other' && <span title="Otro">💳</span>}
+                          <td className="px-3 py-2.5 text-xs text-gray-500">
+                            {t.canal === 'in store' && 'Tienda'}
+                            {t.canal === 'online' && 'Online'}
+                            {t.canal === 'other' && 'Otro'}
                             {!t.canal && '-'}
                           </td>
                           <td className="px-3 py-2.5">
