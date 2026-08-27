@@ -95,19 +95,19 @@ export default function Admin() {
 
   function exportCSV() {
     const txs = filteredTxs();
-    if (!txs.length) { alert('No hay movimientos para exportar.'); return; }
+    if (!txs.length) { alert('No transactions to export.'); return; }
     const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const rows = [['Fecha', 'Descripcion', 'Cuenta', 'Tipo', 'Categoria', 'Canal', 'Estado', 'Monto']];
+    const rows = [['Date', 'Description', 'Account', 'Type', 'Category', 'Channel', 'Status', 'Amount']];
     txs.forEach(t => {
       const accName = datos.accounts?.find(a => a.id === t.cuenta)?.nombre || '';
-      rows.push([t.fecha, t.descripcion, accName, t.tipo, t.categoria || '', t.canal || '', t.pendiente ? 'Pendiente' : 'Confirmado', t.monto.toFixed(2)]);
+      rows.push([t.fecha, t.descripcion, accName, t.tipo, t.categoria || '', t.canal || '', t.pendiente ? 'Pending' : 'Confirmed', t.monto.toFixed(2)]);
     });
     const csv = '\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\r\n');
     const nombre = (selected?.nombre || 'user').replace(/[^a-z0-9]+/gi, '_');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `movimientos_${nombre}_${desde || 'inicio'}_${hasta || 'hoy'}.csv`;
+    a.download = `transactions_${nombre}_${desde || 'start'}_${hasta || 'today'}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
   }
@@ -126,33 +126,33 @@ export default function Admin() {
             <span className="font-serif text-[23px] font-semibold tracking-tight leading-none">
               Bluema<span className="text-brand-600">x</span>p
             </span>
-            <span className="text-xs text-brand-600 bg-brand-50 rounded-full px-2.5 py-0.5 font-semibold self-center ml-1">Contador</span>
+            <span className="text-xs text-brand-600 bg-brand-50 rounded-full px-2.5 py-0.5 font-semibold self-center ml-1">Accountant</span>
           </div>
           <button onClick={logout} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md transition-all">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-            Salir
+            Logout
           </button>
         </div>
 
         <div className="mt-7">
-          <div className="text-xs tracking-widest uppercase text-gray-400">Panel del contador</div>
-          <h1 className="font-serif text-[38px] font-medium tracking-tight mt-1 capitalize">Hola, {adminName}</h1>
+          <div className="text-xs tracking-widest uppercase text-gray-400">Accountant panel</div>
+          <h1 className="font-serif text-[38px] font-medium tracking-tight mt-1 capitalize">Hi, {adminName}</h1>
         </div>
 
         {/* Consolidated Overview */}
         {resumen && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-            <MiniTile label="Total clientes" value={resumen.totalClientes} />
-            <MiniTile label="Conectados" value={resumen.conectados} className="text-pos" />
-            <MiniTile label="Sin banco" value={resumen.sinBanco} className="text-amber-600" />
-            <MiniTile label="Saldo consolidado" value={fmt(resumen.totalSaldo)} />
+            <MiniTile label="Total clients" value={resumen.totalClientes} />
+            <MiniTile label="Connected" value={resumen.conectados} className="text-pos" />
+            <MiniTile label="No bank" value={resumen.sinBanco} className="text-amber-600" />
+            <MiniTile label="Total balance" value={fmt(resumen.totalSaldo)} />
           </div>
         )}
 
         {/* Alerts */}
         {resumen?.alertas?.length > 0 && (
           <div className="mt-4 space-y-2">
-            <div className="text-xs tracking-wider uppercase text-gray-400">Alertas</div>
+            <div className="text-xs tracking-wider uppercase text-gray-400">Alerts</div>
             {resumen.alertas.map((a, i) => (
               <div key={i} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-[12px]">
                 <span className="text-lg">⚠️</span>
@@ -168,14 +168,14 @@ export default function Admin() {
 
         {/* Global transaction search */}
         <div className="mt-6">
-          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Buscar transacciones en todos los usuarios</div>
+          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Search transactions across all users</div>
           <div className="relative">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
               <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
             </svg>
             <input
               className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
-              placeholder="Buscar por descripcion (ej: Netflix, Uber, Walmart)..."
+              placeholder="Search by description (e.g. Netflix, Uber, Walmart)..."
               value={globalSearch}
               onChange={e => setGlobalSearch(e.target.value)}
             />
@@ -185,11 +185,11 @@ export default function Admin() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left">
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Usuario</th>
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Fecha</th>
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">User</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Date</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Description</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,31 +205,31 @@ export default function Admin() {
                 </tbody>
               </table>
               {globalResults.length >= 50 && (
-                <div className="text-center py-2 text-xs text-gray-400 border-t border-gray-100">Mostrando max 50 resultados</div>
+                <div className="text-center py-2 text-xs text-gray-400 border-t border-gray-100">Showing max 50 results</div>
               )}
             </div>
           )}
           {globalSearch.length >= 2 && globalResults.length === 0 && (
-            <p className="text-gray-400 text-sm mt-3">No se encontraron transacciones con "{globalSearch}".</p>
+            <p className="text-gray-400 text-sm mt-3">No transactions found for "{globalSearch}".</p>
           )}
         </div>
 
         {/* User list */}
         <div className="mt-6">
-          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Tus clientes</div>
+          <div className="text-xs tracking-wider uppercase text-gray-400 mb-2">Your clients</div>
           <div className="relative mb-3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" strokeWidth="2" className="absolute left-3.5 top-3.5">
               <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
             </svg>
             <input
               className="w-full pl-11 pr-4 py-3 text-sm border border-gray-200 rounded-[10px] focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10 transition"
-              placeholder="Buscar usuario por nombre o email..."
+              placeholder="Search user by name or email..."
               value={query}
               onChange={e => setQuery(e.target.value)}
             />
           </div>
           <div className="space-y-3">
-            {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No hay usuarios que coincidan.</p>}
+            {usuarios.length === 0 && <p className="text-gray-400 text-sm mt-4">No users match.</p>}
             {usuarios.map(u => (
               <div
                 key={u.id}
@@ -244,11 +244,11 @@ export default function Admin() {
                     <div className="flex items-center gap-2.5">
                       <span className="font-semibold text-[15px] capitalize">{u.nombre}</span>
                       {u.conectado
-                        ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Conectado</span>
-                        : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sin banco</span>
+                        ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Connected</span>
+                        : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">No bank</span>
                       }
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} cuentas &middot; {u.cantidadTransacciones} movimientos</div>
+                    <div className="text-xs text-gray-400 mt-1">{u.email} &middot; {u.cantidadCuentas} accounts &middot; {u.cantidadTransacciones} transactions</div>
                   </div>
                 </div>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
@@ -271,7 +271,7 @@ export default function Admin() {
   return (
     <div className="max-w-[1000px] mx-auto px-5 py-8 pb-16">
       <button onClick={() => { setView('list'); setDatos(null); }} className="text-brand-600 text-sm underline">
-        &larr; Volver a usuarios
+        &larr; Back to users
       </button>
 
       <div className="flex justify-between items-center mt-4 pb-5 border-b border-gray-200">
@@ -285,8 +285,8 @@ export default function Admin() {
             {datos && (
               <div className="mt-2">
                 {datos.conectado
-                  ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Banco conectado</span>
-                  : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sin banco conectado</span>
+                  ? <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-green-50 text-pos border border-pos/20">Bank connected</span>
+                  : <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200">No bank connected</span>
                 }
               </div>
             )}
@@ -294,21 +294,21 @@ export default function Admin() {
         </div>
         <button onClick={refresh} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md transition-all">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
-          Actualizar
+          Refresh
         </button>
       </div>
 
       {!datos ? (
-        <p className="text-gray-400 text-sm mt-6">Cargando...</p>
+        <p className="text-gray-400 text-sm mt-6">Loading...</p>
       ) : (
         <>
           {/* Summary tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-            <MiniTile label="Cuentas" value={datos.accounts?.length || 0} onClick={() => setTileModal('cuentas')} />
-            <MiniTile label="Saldo total" value={fmt(saldoTotal)} onClick={() => setTileModal('saldo')} />
-            <MiniTile label="Movimientos" value={txs.length} onClick={() => setTileModal('movimientos')} />
-            <MiniTile label="Debitos" value={fmt(totalDeb)} className="text-neg" onClick={() => setTileModal('debitos')} />
-            <MiniTile label="Creditos" value={fmt(totalCred)} className="text-pos" onClick={() => setTileModal('creditos')} />
+            <MiniTile label="Accounts" value={datos.accounts?.length || 0} onClick={() => setTileModal('cuentas')} />
+            <MiniTile label="Total balance" value={fmt(saldoTotal)} onClick={() => setTileModal('saldo')} />
+            <MiniTile label="Transactions" value={txs.length} onClick={() => setTileModal('movimientos')} />
+            <MiniTile label="Debits" value={fmt(totalDeb)} className="text-neg" onClick={() => setTileModal('debitos')} />
+            <MiniTile label="Credits" value={fmt(totalCred)} className="text-pos" onClick={() => setTileModal('creditos')} />
           </div>
 
           {/* Tile Modal */}
@@ -319,11 +319,11 @@ export default function Admin() {
           {/* Tabs */}
           <div className="flex gap-1 mt-6 border-b border-gray-200 overflow-x-auto">
             {[
-              { key: 'movimientos', label: 'Movimientos' },
-              { key: 'cuentas', label: 'Cuentas' },
-              { key: 'recurrentes', label: 'Recurrentes' },
-              { key: 'deudas', label: 'Deudas' },
-              { key: 'inversiones', label: 'Inversiones' },
+              { key: 'movimientos', label: 'Transactions' },
+              { key: 'cuentas', label: 'Accounts' },
+              { key: 'recurrentes', label: 'Recurring' },
+              { key: 'deudas', label: 'Liabilities' },
+              { key: 'inversiones', label: 'Investments' },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -343,32 +343,32 @@ export default function Admin() {
           {activeTab === 'movimientos' && (
             <div className="mt-4">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs text-gray-400">Desde
+                <label className="text-xs text-gray-400">From
                   <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
                 </label>
-                <label className="text-xs text-gray-400">Hasta
+                <label className="text-xs text-gray-400">To
                   <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="ml-1.5 px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10" />
                 </label>
-                <button onClick={() => { setDesde(''); setHasta(''); setAdminTxVisible(50); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Limpiar</button>
+                <button onClick={() => { setDesde(''); setHasta(''); setAdminTxVisible(50); }} className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 transition-all">Clear</button>
                 <button onClick={exportCSV} className="ml-auto flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-sm rounded-[11px] shadow-lg shadow-brand-600/25 hover:brightness-110 hover:-translate-y-0.5 transition-all">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-                  Exportar CSV
+                  Export CSV
                 </button>
               </div>
-              <div className="text-xs text-gray-400 mt-2">{txs.length} movimiento(s)</div>
+              <div className="text-xs text-gray-400 mt-2">{txs.length} transaction(s)</div>
 
               {txs.length ? (
                 <div className="mt-3 border border-gray-200 rounded-[14px] overflow-hidden shadow-sm overflow-x-auto">
                   <table className="w-full text-sm min-w-[700px]">
                     <thead>
                       <tr className="bg-gray-50 text-left">
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Fecha</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Categoria</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Canal</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Date</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Description</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Category</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Channel</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                        <th className="px-3 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -383,9 +383,9 @@ export default function Admin() {
                           </td>
                           <td className="px-3 py-2.5 text-xs text-gray-500">{formatCategory(t.categoria)}</td>
                           <td className="px-3 py-2.5 text-xs text-gray-500">
-                            {t.canal === 'in store' && 'Tienda'}
+                            {t.canal === 'in store' && 'In store'}
                             {t.canal === 'online' && 'Online'}
-                            {t.canal === 'other' && 'Otro'}
+                            {t.canal === 'other' && 'Other'}
                             {!t.canal && '-'}
                           </td>
                           <td className="px-3 py-2.5">
@@ -406,13 +406,13 @@ export default function Admin() {
                         onClick={() => setAdminTxVisible(v => v + 50)}
                         className="px-5 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 transition-all"
                       >
-                        Mostrar mas ({txs.length - adminTxVisible} restantes)
+                        Show more ({txs.length - adminTxVisible} remaining)
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm mt-3">No hay movimientos con esos filtros.</p>
+                <p className="text-gray-400 text-sm mt-3">No transactions match those filters.</p>
               )}
             </div>
           )}
@@ -425,10 +425,10 @@ export default function Admin() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left">
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">N°</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Saldo</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Account</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">No.</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Balance</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -444,7 +444,7 @@ export default function Admin() {
                   </table>
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm mt-3">Sin cuentas todavia.</p>
+                <p className="text-gray-400 text-sm mt-3">No accounts yet.</p>
               )}
             </div>
           )}
@@ -457,13 +457,13 @@ export default function Admin() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left">
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Descripcion</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Frecuencia</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Categoria</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Ultima fecha</th>
-                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Description</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Frequency</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Category</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Last date</th>
+                        <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -474,7 +474,7 @@ export default function Admin() {
                           <td className="px-4 py-3 text-xs text-gray-500">{formatCategory(r.categoria)}</td>
                           <td className="px-4 py-3">
                             {r.estado === 'MATURE'
-                              ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Activo</span>
+                              ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Active</span>
                               : <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 font-semibold border border-gray-200">{r.estado || '-'}</span>
                             }
                           </td>
@@ -487,7 +487,7 @@ export default function Admin() {
                   </table>
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm mt-3">No se detectaron transacciones recurrentes.</p>
+                <p className="text-gray-400 text-sm mt-3">No recurring transactions detected.</p>
               )}
             </div>
           )}
@@ -514,7 +514,7 @@ function formatCategory(cat) {
 }
 
 function formatFreq(freq) {
-  const map = { WEEKLY: 'Semanal', BIWEEKLY: 'Quincenal', SEMI_MONTHLY: 'Bimensual', MONTHLY: 'Mensual', ANNUALLY: 'Anual' };
+  const map = { WEEKLY: 'Weekly', BIWEEKLY: 'Biweekly', SEMI_MONTHLY: 'Twice a month', MONTHLY: 'Monthly', ANNUALLY: 'Yearly' };
   return map[freq] || freq || '-';
 }
 
@@ -542,19 +542,19 @@ function AdminTileModal({ type, datos, txs, onClose }) {
   let title = '', items = [], mode = 'tx';
 
   if (type === 'cuentas' || type === 'saldo') {
-    title = type === 'saldo' ? 'Saldo total' : 'Cuentas';
+    title = type === 'saldo' ? 'Total balance' : 'Accounts';
     mode = 'acc';
     items = datos?.accounts || [];
   } else if (type === 'debitos') {
-    title = 'Debitos';
+    title = 'Debits';
     mode = 'tx';
     items = txs.filter(t => t.tipo === 'debito');
   } else if (type === 'creditos') {
-    title = 'Creditos';
+    title = 'Credits';
     mode = 'tx';
     items = txs.filter(t => t.tipo === 'credito');
   } else {
-    title = 'Movimientos';
+    title = 'Transactions';
     mode = 'tx';
     items = txs;
   }
@@ -577,7 +577,7 @@ function AdminTileModal({ type, datos, txs, onClose }) {
       <div className="bg-white border border-gray-200 rounded-[18px] w-full max-w-[560px] max-h-[82vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-start p-5 pb-3">
           <div>
-            <div className="text-[11px] tracking-widest uppercase text-gray-400">{mode === 'tx' ? 'Transacciones' : 'Cuentas'}</div>
+            <div className="text-[11px] tracking-widest uppercase text-gray-400">{mode === 'tx' ? 'Transactions' : 'Accounts'}</div>
             <h3 className="font-serif text-2xl font-semibold mt-1">{title}</h3>
           </div>
           <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-900 px-1.5 rounded-lg hover:bg-gray-100 transition-colors">&times;</button>
@@ -589,21 +589,21 @@ function AdminTileModal({ type, datos, txs, onClose }) {
             </svg>
             <input
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/10"
-              placeholder="Buscar..."
+              placeholder="Search..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
           <select value={sort} onChange={e => setSort(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
-            <option value="desc">Mayor a menor</option>
-            <option value="asc">Menor a mayor</option>
+            <option value="desc">Highest first</option>
+            <option value="asc">Lowest first</option>
           </select>
         </div>
         <div className="px-5 pb-2 text-xs text-gray-400">
-          {filtered.length} {mode === 'tx' ? 'movimientos' : 'cuentas'} &middot; {fmt(total)}
+          {filtered.length} {mode === 'tx' ? 'transactions' : 'accounts'} &middot; {fmt(total)}
         </div>
         <div className="overflow-y-auto px-5 pb-5">
-          {filtered.length === 0 && <p className="text-gray-400 text-sm py-4 text-center">Sin resultados.</p>}
+          {filtered.length === 0 && <p className="text-gray-400 text-sm py-4 text-center">No results.</p>}
           {mode === 'tx' ? filtered.map((t, i) => (
             <div key={i} className="flex justify-between items-center gap-3 py-3 border-b border-gray-100 last:border-0">
               <div className="min-w-0">
@@ -631,7 +631,7 @@ function AdminTileModal({ type, datos, txs, onClose }) {
 
 function AdminLiabilitiesTab({ liabilities, accounts }) {
   if (!liabilities || (!liabilities.liabilities?.credit?.length && !liabilities.liabilities?.student?.length && !liabilities.liabilities?.mortgage?.length)) {
-    return <p className="text-gray-400 text-sm mt-6">No se encontraron deudas para este usuario.</p>;
+    return <p className="text-gray-400 text-sm mt-6">No liabilities found for this user.</p>;
   }
 
   const { credit = [], student = [], mortgage = [] } = liabilities.liabilities;
@@ -644,17 +644,17 @@ function AdminLiabilitiesTab({ liabilities, accounts }) {
     <div className="mt-4 space-y-6">
       {credit.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Tarjetas de credito</h4>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Credit cards</h4>
           <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Cuenta</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Account</th>
                   <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Balance</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Pago min.</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Min. payment</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Next payment</th>
                   <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">APR</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -667,8 +667,8 @@ function AdminLiabilitiesTab({ liabilities, accounts }) {
                     <td className="px-4 py-3 text-xs font-mono">{c.aprs?.[0]?.apr_percentage ? `${c.aprs[0].apr_percentage}%` : '-'}</td>
                     <td className="px-4 py-3">
                       {c.sobreVencido
-                        ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-neg font-semibold border border-red-200">Vencido</span>
-                        : <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Al dia</span>
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-neg font-semibold border border-red-200">Overdue</span>
+                        : <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-pos font-semibold border border-green-200">Current</span>
                       }
                     </td>
                   </tr>
@@ -681,23 +681,23 @@ function AdminLiabilitiesTab({ liabilities, accounts }) {
 
       {student.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Prestamos estudiantiles</h4>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Student loans</h4>
           <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Prestamo</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Loan</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</th>
                   <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Original</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tasa</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Pago min.</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Rate</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Min. payment</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Next payment</th>
                 </tr>
               </thead>
               <tbody>
                 {student.map((s, i) => (
                   <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3">{s.nombre || 'Prestamo'}</td>
+                    <td className="px-4 py-3">{s.nombre || 'Loan'}</td>
                     <td className="px-4 py-3 text-xs">{s.estado || '-'}</td>
                     <td className="px-4 py-3 text-right font-mono">{fmt(s.balanceOriginal)}</td>
                     <td className="px-4 py-3 text-xs font-mono">{s.tasaInteres != null ? `${s.tasaInteres}%` : '-'}</td>
@@ -713,23 +713,23 @@ function AdminLiabilitiesTab({ liabilities, accounts }) {
 
       {mortgage.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Hipotecas</h4>
+          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">Mortgages</h4>
           <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tasa</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Monto original</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Ultimo pago</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Proximo pago</th>
-                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Desde</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Rate</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Original amount</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Last payment</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Next payment</th>
+                  <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Since</th>
                 </tr>
               </thead>
               <tbody>
                 {mortgage.map((m, i) => (
                   <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3">{m.tipo || 'Hipoteca'}</td>
+                    <td className="px-4 py-3">{m.tipo || 'Mortgage'}</td>
                     <td className="px-4 py-3 text-xs font-mono">{m.tasaInteres != null ? `${m.tasaInteres}%` : '-'}</td>
                     <td className="px-4 py-3 text-right font-mono">{fmt(m.montoOriginal)}</td>
                     <td className="px-4 py-3 text-right font-mono">{fmt(m.ultimoPago)}</td>
@@ -748,7 +748,7 @@ function AdminLiabilitiesTab({ liabilities, accounts }) {
 
 function AdminInvestmentsTab({ investments }) {
   if (!investments || !investments.holdings?.length) {
-    return <p className="text-gray-400 text-sm mt-6">No se encontraron inversiones para este usuario.</p>;
+    return <p className="text-gray-400 text-sm mt-6">No investments found for this user.</p>;
   }
 
   const { holdings } = investments;
@@ -758,9 +758,9 @@ function AdminInvestmentsTab({ investments }) {
   return (
     <div className="mt-4">
       <div className="grid sm:grid-cols-3 gap-3 mb-4">
-        <MiniTile label="Valor total" value={fmt(totalValue)} />
-        <MiniTile label="Costo base" value={fmt(totalCost)} />
-        <MiniTile label="Ganancia/Perdida" value={fmt(totalValue - totalCost)} className={totalValue - totalCost >= 0 ? 'text-pos' : 'text-neg'} />
+        <MiniTile label="Total value" value={fmt(totalValue)} />
+        <MiniTile label="Cost basis" value={fmt(totalCost)} />
+        <MiniTile label="Gain/Loss" value={fmt(totalValue - totalCost)} className={totalValue - totalCost >= 0 ? 'text-pos' : 'text-neg'} />
       </div>
 
       <div className="border border-gray-200 rounded-[14px] overflow-hidden shadow-sm">
@@ -769,11 +769,11 @@ function AdminInvestmentsTab({ investments }) {
             <tr className="bg-gray-50 text-left">
               <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Security</th>
               <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Ticker</th>
-              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Tipo</th>
-              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Cantidad</th>
-              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Precio</th>
-              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Valor</th>
-              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Costo base</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Type</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Quantity</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Price</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Value</th>
+              <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-400 font-semibold text-right">Cost basis</th>
             </tr>
           </thead>
           <tbody>
