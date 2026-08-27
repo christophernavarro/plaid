@@ -48,6 +48,7 @@ export default function Dashboard() {
   // Modal
   const [modal, setModal] = useState(null); // null | 'balance' | 'income' | 'expenses' | 'accounts'
   const [chartModal, setChartModal] = useState(null); // null | 'monthly' | 'category'
+  const [txVisible, setTxVisible] = useState(20);
   const navigate = useNavigate();
   const nombre = localStorage.getItem('userName') || '';
 
@@ -309,7 +310,7 @@ export default function Dashboard() {
                   </select>
                   {(search || catFilter || dateRange !== 'all') && (
                     <button
-                      onClick={() => { setSearch(''); setCatFilter(''); setDateRange('all'); setCustomFrom(''); setCustomTo(''); }}
+                      onClick={() => { setSearch(''); setCatFilter(''); setDateRange('all'); setCustomFrom(''); setCustomTo(''); setTxVisible(20); }}
                       className="text-xs text-brand-600 hover:underline"
                     >
                       Clear filters
@@ -328,7 +329,7 @@ export default function Dashboard() {
                 <div className="text-xs text-gray-400 mb-2">{filteredTxs.length} transaction{filteredTxs.length !== 1 ? 's' : ''}</div>
 
                 <div className="space-y-0">
-                  {filteredTxs.slice(0, 20).map((t, i) => (
+                  {filteredTxs.slice(0, txVisible).map((t, i) => (
                     <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
                       <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {t.logo ? (
@@ -356,8 +357,15 @@ export default function Dashboard() {
                       </span>
                     </div>
                   ))}
-                  {filteredTxs.length > 20 && (
-                    <p className="text-center text-xs text-gray-400 pt-3">Showing 20 of {filteredTxs.length}. Use filters to narrow results.</p>
+                  {filteredTxs.length > txVisible && (
+                    <div className="text-center pt-4">
+                      <button
+                        onClick={() => setTxVisible(v => v + 20)}
+                        className="px-5 py-2.5 border border-gray-200 rounded-[10px] text-sm font-medium hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 transition-all"
+                      >
+                        Show more ({filteredTxs.length - txVisible} remaining)
+                      </button>
+                    </div>
                   )}
                   {filteredTxs.length === 0 && (
                     <p className="text-center text-gray-400 text-sm py-6">No transactions match your filters.</p>
