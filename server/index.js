@@ -119,6 +119,7 @@ app.post('/api/registro', (req, res) => {
     transactions: {},
     accounts: [],
     conectado: false,
+    notificaciones: [],
   };
   emailIndex[key] = id;
   guardarDatos();
@@ -354,6 +355,17 @@ app.get('/api/mi/investments', requiereUsuario, async (req, res) => {
     console.error(err.response ? err.response.data : err);
     res.status(500).json({ error: 'No se pudieron traer las inversiones' });
   }
+});
+
+// --- User notifications ---
+app.get('/api/mi/notificaciones', requiereUsuario, (req, res) => {
+  res.json({ notificaciones: req.usuario.notificaciones || [] });
+});
+
+app.post('/api/mi/notificaciones/:notifId/leer', requiereUsuario, (req, res) => {
+  const notif = (req.usuario.notificaciones || []).find(n => n.id === req.params.notifId);
+  if (notif) { notif.leida = true; guardarDatos(); }
+  res.json({ ok: true });
 });
 
 // ==========================================================================
@@ -614,6 +626,25 @@ app.get('/api/admin/usuarios/:id/investments', requiereAdmin, async (req, res) =
     console.error(err.response ? err.response.data : err);
     res.status(500).json({ error: 'No se pudieron traer las inversiones' });
   }
+});
+
+// Admin: send a notification to a user (e.g. reminder to connect bank)
+app.post('/api/admin/usuarios/:id/notificar', requiereAdmin, (req, res) => {
+  const u = usuarios[req.params.id];
+  if (!u) return res.status(404).json({ error: 'Usuario no existe' });
+  const { mensaje, tipo } = req.body;
+  if (!u.notificaciones) u.notificaciones = [];
+  const notif = {
+    id: nuevoId(),
+    tipo: tipo || 'conectar_banco',
+    mensaje: mensaje || 'Your accountant asks you to connect your bank account.',
+    fecha: new Date().toISOString(),
+    leida: false,
+    de: ADMIN_NAME,
+  };
+  u.notificaciones.unshift(notif);
+  guardarDatos();
+  res.json({ ok: true, notificacion: notif });
 });
 
 // ==========================================================================

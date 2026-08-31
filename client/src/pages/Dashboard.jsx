@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [investments, setInvestments] = useState(null);
   const [loading, setLoading] = useState(true);
   const [connectStatus, setConnectStatus] = useState('');
+  const [notificaciones, setNotificaciones] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   // Filters
   const [search, setSearch] = useState('');
@@ -61,6 +62,9 @@ export default function Dashboard() {
     }
     setData(res);
     setLoading(false);
+    // Load notifications
+    const notifRes = await api('/api/mi/notificaciones');
+    if (notifRes.notificaciones) setNotificaciones(notifRes.notificaciones);
     if (res.conectado) {
       const recRes = await api('/api/mi/recurring');
       if (recRes.recurring) setRecurring(recRes.recurring);
@@ -70,6 +74,11 @@ export default function Dashboard() {
       if (invRes.holdings) setInvestments(invRes);
     }
   }, [navigate]);
+
+  async function dismissNotif(id) {
+    await api(`/api/mi/notificaciones/${id}/leer`, { method: 'POST' });
+    setNotificaciones(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n));
+  }
 
   useEffect(() => {
     cargar();
@@ -171,6 +180,27 @@ export default function Dashboard() {
           Hi, {data?.nombre || nombre}
         </h1>
       </div>
+
+      {/* Notifications from accountant */}
+      {notificaciones.filter(n => !n.leida).map(n => (
+        <div key={n.id} className="mt-5 flex items-start gap-3 p-4 bg-brand-50 border border-brand-200 rounded-[14px]">
+          <span className="w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1f3a52" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-brand-700">Message from {n.de || 'your accountant'}</div>
+            <p className="text-sm text-gray-600 mt-0.5">{n.mensaje}</p>
+            {n.tipo === 'conectar_banco' && !data?.conectado && (
+              <button onClick={connectBank} className="mt-2.5 px-4 py-2 bg-gradient-to-b from-brand-500 to-brand-600 text-white text-sm font-semibold rounded-[10px] shadow-md shadow-brand-600/25 hover:brightness-110 transition-all">
+                Connect bank now
+              </button>
+            )}
+          </div>
+          <button onClick={() => dismissNotif(n.id)} className="text-gray-400 hover:text-gray-700 flex-shrink-0" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      ))}
 
       {!data?.conectado ? (
         <div className="border border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-[22px] p-12 text-center max-w-[560px] mx-auto mt-8 shadow-xl shadow-gray-900/[0.09]">
