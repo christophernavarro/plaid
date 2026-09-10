@@ -72,6 +72,7 @@ export default function Admin() {
     setReminderSent(false);
     setRecurring([]); setLiabilities(null); setInvestments(null);
     const data = await api(`/api/admin/usuarios/${u.id}/datos`);
+    if (data.error) { logout(); return; }
     setDatos(data);
     // Fetch extra data
     const [recRes, liabRes, invRes] = await Promise.all([

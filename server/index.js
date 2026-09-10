@@ -40,13 +40,20 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 
 let usuarios = {};          // userId -> datos del usuario final
 let emailIndex = {};        // email (lower) -> userId
-const sesionesUsuario = {};   // token de sesion -> userId (no se persisten)
-const sesionesAdmin = new Set(); // tokens de sesion del admin/contador (no se persisten)
+let sesionesUsuario = {};   // token de sesion -> userId
+let sesionesAdmin = new Set(); // tokens de sesion del admin/contador
 let itemAusuario = {};      // plaid item_id -> userId (para webhooks)
 
 // --- Persistencia ---
 function guardarDatos() {
-  const state = { usuarios, emailIndex, itemAusuario };
+  const state = {
+    usuarios,
+    emailIndex,
+    itemAusuario,
+    // Sesiones persistidas para que sobrevivan reinicios del server
+    sesionesUsuario,
+    sesionesAdmin: Array.from(sesionesAdmin),
+  };
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2), 'utf-8');
   } catch (err) {
@@ -62,6 +69,8 @@ function cargarDatos() {
       usuarios = state.usuarios || {};
       emailIndex = state.emailIndex || {};
       itemAusuario = state.itemAusuario || {};
+      sesionesUsuario = state.sesionesUsuario || {};
+      sesionesAdmin = new Set(state.sesionesAdmin || []);
       console.log(`Datos cargados: ${Object.keys(usuarios).length} usuario(s)`);
     }
   } catch (err) {
@@ -122,10 +131,10 @@ app.post('/api/registro', (req, res) => {
     notificaciones: [],
   };
   emailIndex[key] = id;
-  guardarDatos();
 
   const token = nuevoId();
   sesionesUsuario[token] = id;
+  guardarDatos();
   res.json({ token, role: 'user', nombre: usuarios[id].nombre });
 });
 
@@ -139,6 +148,7 @@ app.post('/api/login', (req, res) => {
   if (key === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     const token = nuevoId();
     sesionesAdmin.add(token);
+    guardarDatos();
     return res.json({ token, role: 'admin', nombre: ADMIN_NAME });
   }
 
@@ -150,6 +160,7 @@ app.post('/api/login', (req, res) => {
   }
   const token = nuevoId();
   sesionesUsuario[token] = id;
+  guardarDatos();
   res.json({ token, role: 'user', nombre: u.nombre });
 });
 
@@ -377,6 +388,7 @@ app.post('/api/admin/login', (req, res) => {
   }
   const token = nuevoId();
   sesionesAdmin.add(token);
+  guardarDatos();
   res.json({ token });
 });
 
