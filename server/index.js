@@ -256,7 +256,7 @@ app.get('/api/mi/balance', requiereUsuario, async (req, res) => {
     });
     const accounts = response.data.accounts.map(a => ({
       id: a.account_id,
-      nombre: a.official_name || a.name,
+      nombre: normalizeName(a.official_name, a.name),
       tipo: a.subtype || a.type,
       mask: a.mask || '',
       saldoActual: a.balances.current,
@@ -780,10 +780,33 @@ function formatTransaction(t) {
   };
 }
 
+// Plaid sandbox returns fake names like "Plaid Gold Standard 0% Interest Checking".
+// This maps them to real US bank names so the demo looks realistic.
+const SANDBOX_NAME_MAP = {
+  'Plaid Gold Standard 0% Interest Checking': 'Chase Total Checking',
+  'Plaid Silver Standard 0.1% Interest Saving': 'Chase Savings',
+  'Plaid Bronze Standard 0.2% Interest CD': 'Citibank CD',
+  'Plaid Diamond 12.5% APR Interest Credit Card': 'Chase Sapphire Credit Card',
+  'Plaid Platinum Standard 1.85% Interest Money Market': 'Wells Fargo Money Market',
+  'Plaid IRA': 'Fidelity IRA',
+  'Plaid 401k': 'Fidelity 401(k)',
+  'Plaid Student Loan': 'Navient Student Loan',
+  'Plaid Mortgage': 'Wells Fargo Mortgage',
+  'Plaid Cares Health Savings Account': 'Bank of America HSA',
+};
+
+function normalizeName(official, name) {
+  if (official && SANDBOX_NAME_MAP[official]) return SANDBOX_NAME_MAP[official];
+  if (name && SANDBOX_NAME_MAP[name]) return SANDBOX_NAME_MAP[name];
+  // Strip generic "Plaid " prefix from any other sandbox names
+  const raw = official || name || '';
+  return raw.startsWith('Plaid ') ? raw.replace(/^Plaid /, '') : raw;
+}
+
 function formatAccount(a) {
   return {
     id: a.account_id,
-    nombre: a.official_name || a.name,
+    nombre: normalizeName(a.official_name, a.name),
     tipo: a.subtype || a.type,
     mask: a.mask || '',
     saldo: a.balances ? a.balances.current : null,
