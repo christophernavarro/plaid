@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmt } from '../lib/api';
+import { TellerConnectButton, TellerView } from '../components/Teller';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const MESES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [connectStatus, setConnectStatus] = useState('');
   const [notificaciones, setNotificaciones] = useState([]);
+  const [tellerConfig, setTellerConfig] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   // Filters
   const [search, setSearch] = useState('');
@@ -83,6 +85,11 @@ export default function Dashboard() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Teller is optional: the button only works when the server has an application id.
+  useEffect(() => {
+    api('/api/mi/teller/config').then((r) => { if (!r.error) setTellerConfig(r); });
+  }, []);
 
   function logout() {
     localStorage.removeItem('userToken');
@@ -190,7 +197,7 @@ export default function Dashboard() {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-brand-700">Message from {n.de || 'your accountant'}</div>
             <p className="text-sm text-gray-600 mt-0.5">{n.mensaje}</p>
-            {n.tipo === 'conectar_banco' && !data?.conectado && (
+            {n.tipo === 'conectar_banco' && !data?.conectado && !data?.proveedor && (
               <button onClick={connectBank} className="mt-2.5 px-4 py-2 bg-gradient-to-b from-brand-500 to-brand-600 text-white text-sm font-semibold rounded-[10px] shadow-md shadow-brand-600/25 hover:brightness-110 transition-all">
                 Connect bank now
               </button>
@@ -202,7 +209,9 @@ export default function Dashboard() {
         </div>
       ))}
 
-      {!data?.conectado ? (
+      {data?.proveedor === 'teller' ? (
+        <TellerView onDisconnected={cargar} />
+      ) : !data?.conectado ? (
         <div className="border border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-[22px] p-12 text-center max-w-[560px] mx-auto mt-8 shadow-xl shadow-gray-900/[0.09]">
           <span className="inline-flex items-center justify-center w-[70px] h-[70px] rounded-[20px] bg-gradient-to-br from-brand-50 to-brand-100 shadow-inner">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1f3a52" strokeWidth="1.7"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -211,9 +220,34 @@ export default function Dashboard() {
           <p className="text-[15px] text-gray-500 leading-relaxed max-w-[400px] mx-auto mt-1.5">
             Securely link your account so your accountant can keep your finances up to date. We never see your credentials.
           </p>
-          <button onClick={connectBank} className="mt-6 px-7 py-3.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-[15px] rounded-xl shadow-lg shadow-brand-600/30 hover:brightness-110 hover:-translate-y-0.5 transition-all">
-            Connect bank
-          </button>
+          <p className="text-xs tracking-widest uppercase text-gray-400 mt-6">Choose how to connect</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+            <button onClick={connectBank} className="px-7 py-3.5 bg-gradient-to-b from-brand-500 to-brand-600 text-white font-semibold text-[15px] rounded-xl shadow-lg shadow-brand-600/30 hover:brightness-110 hover:-translate-y-0.5 transition-all">
+              Connect with Plaid
+            </button>
+            {tellerConfig?.configured ? (
+              <TellerConnectButton
+                applicationId={tellerConfig.applicationId}
+                environment={tellerConfig.environment}
+                onEnrolled={cargar}
+                onStatus={setConnectStatus}
+                className="px-7 py-3.5 border border-brand-200 bg-brand-50 text-brand-600 font-semibold text-[15px] rounded-xl hover:bg-brand-100 hover:border-brand-300 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                Connect with Teller
+              </TellerConnectButton>
+            ) : (
+              <button
+                disabled
+                title="Teller is not configured on the server (set TELLER_APPLICATION_ID)"
+                className="px-7 py-3.5 border border-gray-200 bg-gray-50 text-gray-400 font-semibold text-[15px] rounded-xl cursor-not-allowed"
+              >
+                Connect with Teller
+              </button>
+            )}
+          </div>
+          {tellerConfig && !tellerConfig.configured && (
+            <p className="text-gray-400 text-xs mt-3">Teller is not set up on this server yet.</p>
+          )}
           {connectStatus && <p className="text-gray-400 text-sm mt-3">{connectStatus}</p>}
         </div>
       ) : (

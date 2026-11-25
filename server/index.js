@@ -4,6 +4,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { PlaidApi, Configuration, PlaidEnvironments, Products, CountryCode } = require('plaid');
 
 const app = express();
@@ -208,7 +209,9 @@ app.post('/api/mi/exchange', requiereUsuario, async (req, res) => {
 app.get('/api/mi/datos', requiereUsuario, async (req, res) => {
   try {
     const datos = await obtenerDatos(req.usuario);
-    res.json(Object.assign({ nombre: req.usuario.nombre }, datos));
+    // Proveedor con el que el usuario conecto su banco (null si todavia no conecto)
+    const proveedor = req.usuario.teller ? 'teller' : (req.usuario.accessToken ? 'plaid' : null);
+    res.json(Object.assign({ nombre: req.usuario.nombre, proveedor }, datos));
   } catch (err) {
     console.error(err.response ? err.response.data : err);
     res.status(500).json({ error: 'No se pudieron traer tus datos' });
@@ -376,6 +379,140 @@ app.get('/api/mi/notificaciones', requiereUsuario, (req, res) => {
 app.post('/api/mi/notificaciones/:notifId/leer', requiereUsuario, (req, res) => {
   const notif = (req.usuario.notificaciones || []).find(n => n.id === req.params.notifId);
   if (notif) { notif.leida = true; guardarDatos(); }
+  res.json({ ok: true });
+});
+
+// ==========================================================================
+// Teller (segunda opcion para conectar el banco, solo EE.UU.)
+// Los datos de Teller se devuelven tal cual los entrega su API, sin
+// convertirlos al formato de Plaid. Es para explorar que trae cada proveedor.
+// ==========================================================================
+const TELLER_APPLICATION_ID = process.env.TELLER_APPLICATION_ID || '';
+const TELLER_ENV = process.env.TELLER_ENV || 'sandbox';
+let tellerAgent; // undefined = aun no cargado, null = sin certificado
+
+// Teller exige certificado de cliente (mTLS) en development y production.
+// En sandbox no hace falta.
+function getTellerAgent() {
+  if (tellerAgent !== undefined) return tellerAgent;
+  const certPath = process.env.TELLER_CERT_PATH;
+  const keyPath = process.env.TELLER_KEY_PATH;
+  tellerAgent = certPath && keyPath
+    ? new https.Agent({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) })
+    : null;
+  return tellerAgent;
+}
+
+// GET a la API de Teller. El access token va como usuario de HTTP Basic (sin clave).
+function tellerGet(pathAndQuery, token) {
+  return new Promise((resolve) => {
+    let agent;
+    try {
+      agent = getTellerAgent();
+    } catch (err) {
+      return resolve({ ok: false, status: 0, body: { error: { code: 'certificate', message: 'No se pudo leer el certificado de Teller: ' + err.message } } });
+    }
+    const req = https.request({
+      host: 'api.teller.io',
+      path: pathAndQuery,
+      method: 'GET',
+      agent: agent || undefined,
+      timeout: 20000,
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(token + ':').toString('base64'),
+        Accept: 'application/json',
+      },
+    }, (res) => {
+      let raw = '';
+      res.on('data', (c) => { raw += c; });
+      res.on('end', () => {
+        let body = null;
+        try { body = raw ? JSON.parse(raw) : null; } catch (e) { body = { raw: raw.slice(0, 500) }; }
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body });
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('api.teller.io no respondio a tiempo')));
+    req.on('error', (e) => resolve({ ok: false, status: 0, body: { error: { code: 'network', message: e.message } } }));
+    req.end();
+  });
+}
+
+// Convierte una respuesta en: datos tal cual, { unavailable: true } o { error }.
+function tellerUnwrap(r) {
+  if (r === null) return { unavailable: true };
+  if (r.ok) return r.body;
+  const e = (r.body && r.body.error) || r.body || {};
+  return { error: { code: e.code || 'http_' + r.status, message: e.message || 'La solicitud fallo (HTTP ' + r.status + ')' } };
+}
+
+app.get('/api/mi/teller/config', requiereUsuario, (req, res) => {
+  res.json({
+    configured: Boolean(TELLER_APPLICATION_ID),
+    applicationId: TELLER_APPLICATION_ID || null,
+    environment: TELLER_ENV,
+  });
+});
+
+app.post('/api/mi/teller/enroll', requiereUsuario, (req, res) => {
+  const { accessToken, userId, enrollmentId, institution } = req.body || {};
+  if (typeof accessToken !== 'string' || !accessToken) {
+    return res.status(400).json({ error: 'Falta el access token de Teller' });
+  }
+  if (req.usuario.accessToken) {
+    return res.status(409).json({ error: 'Esta cuenta ya esta conectada con Plaid' });
+  }
+  req.usuario.teller = {
+    accessToken,
+    userId: userId || null,
+    enrollmentId: enrollmentId || null,
+    institution: institution || null,
+    environment: TELLER_ENV,
+    conectadoEn: new Date().toISOString(),
+  };
+  guardarDatos();
+  res.json({ ok: true });
+});
+
+app.get('/api/mi/teller/datos', requiereUsuario, async (req, res) => {
+  const t = req.usuario.teller;
+  if (!t) return res.status(404).json({ error: 'No hay una conexion con Teller' });
+
+  const accountsR = await tellerGet('/accounts', t.accessToken);
+  if (!accountsR.ok) {
+    return res.status(502).json({ error: tellerUnwrap(accountsR).error.message });
+  }
+
+  // Un recurso solo se pide si Teller lo anuncia en los links de la cuenta.
+  // Las cuentas se recorren una por una para no gatillar el limite de solicitudes.
+  const accounts = [];
+  for (const acc of accountsR.body || []) {
+    const links = acc.links || {};
+    const [balances, details, transactions] = await Promise.all([
+      links.balances ? tellerGet(`/accounts/${acc.id}/balances`, t.accessToken) : null,
+      links.details ? tellerGet(`/accounts/${acc.id}/details`, t.accessToken) : null,
+      links.transactions ? tellerGet(`/accounts/${acc.id}/transactions?count=100`, t.accessToken) : null,
+    ]);
+    accounts.push({
+      account: acc,
+      balances: tellerUnwrap(balances),
+      details: tellerUnwrap(details),
+      transactions: tellerUnwrap(transactions),
+    });
+  }
+  const identity = tellerUnwrap(await tellerGet('/identity', t.accessToken));
+
+  res.json({
+    institution: t.institution,
+    environment: t.environment,
+    conectadoEn: t.conectadoEn,
+    accounts,
+    identity,
+  });
+});
+
+app.post('/api/mi/teller/desconectar', requiereUsuario, (req, res) => {
+  req.usuario.teller = null;
+  guardarDatos();
   res.json({ ok: true });
 });
 
